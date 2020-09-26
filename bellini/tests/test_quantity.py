@@ -20,7 +20,7 @@ def test_change_mutable():
         ureg.liter
     )
 
-    volume.mutable = True    
+    volume.mutable = True
 
 def test_new_quantity_torch():
     import bellini as be
