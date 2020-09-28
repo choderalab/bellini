@@ -3,29 +3,28 @@
 # =============================================================================
 import abc
 import bellini as be
+import pint; ureg = pint.UnitRegistry()
 
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
 class Substance(abc.ABC):
-    """ Base class for all substances. """
-    def __init__(self, mole, **extras):
-        self.mole = mole
-        self.extras = extras
-
-
-class Solvent(Substance):
-    """ Solvent. """
-    def __init__(self, volume, molar_volume, **extras):
-
-        # compute the quantity
-        mole = volume / molar_volume
-
-        # initialize a substance class
-        super(Solvent, self).__init__(
-            mol=mole,
-            **extras,
+    """ Base class for substance with species and quantity. """
+    def __init__(self, species, mole, **extras):
+        # assert the type for species and mole
+        assert isinstance(
+            species,
+            be.species.Species
         )
 
-        self.volume = volume
-        self.molar_volume = molar_volume
+        assert isinstance(
+            mole,
+            be.quantity.Quantity,
+        )
+
+        # assert the unit of mole is indeed mole
+        assert mole.unit == ureg.mole
+
+        self.species = species
+        self.mole = mole
+        self.extras = extras
