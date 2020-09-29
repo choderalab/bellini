@@ -4,8 +4,7 @@ Bayesian Learning on Laboratory Investigations
 """
 
 # Add imports here
-from . import quantity
-from . import group
+from . import quantity, groups, distributions
 
 # Handle versioneer
 from ._version import get_versions
