@@ -15,17 +15,8 @@ ureg = pint.UnitRegistry()
 # =============================================================================
 class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
-    allowed_instances = (
-        Quantity, Distribution,
-    )
 
     def __init__(self, name=None, laws=None, **values):
-
-        # sanity check quantities
-        assert all(
-            isinstance(value, self.allowed_instances)
-            for value in values), "input instance is not allowed."
-
         self.values = values
         self.laws = laws
         self.name = name
@@ -73,14 +64,15 @@ class Species(Group):
             Quantity
         )
 
-        assert moles.unit.is_compatible_with(
-            ureg.mole
-        )
+        assert moles.units.dimensionality == ureg.mole.dimensionality
 
         return Substance(
             species=self,
             moles=moles,
         )
+
+    def __repr__(self):
+        return self.name
 
 class Substance(Group):
     """ A chemical substance with species and quantities. """
@@ -102,34 +94,89 @@ class Substance(Group):
             **values
         )
 
-    def __add__(self, substance):
-        assert isinstance(
-            substance,
-            Substance,
+    def __repr__(self):
+        return '%s of %s' % (str(self.moles), str(self.species))
+
+    def __add__(self, x):
+
+        if isinstance(x, Substance):
+            if x.species == self.species:
+                return Substance(
+                    self.species,
+                    self.moles + x.moles
+                )
+
+            else:
+                return Mixture(
+                    [
+                        self,
+                        x,
+                    ]
+                )
+
+        elif isinstance(x, Mixture):
+            return x + self
+
+    def __mul__(self, x):
+        assert isinstance(x, float)
+
+        return Substance(
+            self.species,
+            x * self.moles,
         )
 
-        if substance.species == self.species:
-            return Substance(
-                self.species,
-                self.moles + substance.moles
-            )
-
-        else:
-            return Mixture(
-                [
-                    self,
-                    substance,
-                ]
-            )
 
 class Mixture(Group):
     """ A simple mixture of substances. """
-    allowed_instances = (list, )
-
     def __init__(self, substances, **values):
-        # sanity check quantities
-        assert all(
-            isinstance(substance, Substance)
-            for substance in substances), "input instance is not allowed."
-
         super(Mixture, self).__init__(substances=substances, **values)
+
+    def __repr__(self):
+        return ' and '.join([str(x) for x in self.substances])
+
+    def __mul__(self, x):
+        assert isinstance(x, float)
+
+        return Mixture(
+            [
+                Substance(
+                    species=substance.species,
+                    moles=x * substance.moles,
+                ) for substance in self.substances
+            ]
+        )
+
+    def __add__(self, x):
+
+        if isinstance(x, Substance):
+            substances = [
+                Substance(
+                    species=substance.species,
+                    moles=substance.moles,
+                ) for substance in self.substances
+            ]
+
+            # print([substance.species for substance in substances])
+
+            new_substance = True
+            for idx, substance in enumerate(substances):
+                if x.species == substance.species:
+                    substances[idx] = Substance(
+                        substance.species,
+                        substance.moles + x.moles
+                    )
+                    new_substance = False
+
+            if new_substance is True:
+                substances.append(x)
+
+            return Mixture(substances=substances)
+
+        elif isinstance(x, Mixture):
+            mixture = self
+            for substance in x.substances:
+                mixture = mixture + substance
+            return mixture
+
+    def __eq__(self, x):
+        return set(self.substances) == set(self.substances)
