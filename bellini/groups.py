@@ -74,6 +74,9 @@ class Species(Group):
     def __repr__(self):
         return self.name
 
+    def __hash__(self):
+        return hash(self.name)
+
 class Substance(Group):
     """ A chemical substance with species and quantities. """
     def __init__(self, species, moles, **values):
@@ -125,11 +128,13 @@ class Substance(Group):
             x * self.moles,
         )
 
+    def __hash__(self):
+        return hash(self.moles.magnitude) + hash(self.species)
 
 class Mixture(Group):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
-        super(Mixture, self).__init__(substances=substances, **values)
+        super(Mixture, self).__init__(substances=set(substances), **values)
 
     def __repr__(self):
         return ' and '.join([str(x) for x in self.substances])
@@ -179,4 +184,4 @@ class Mixture(Group):
             return mixture
 
     def __eq__(self, x):
-        return set(self.substances) == set(self.substances)
+        return self.substances == self.substances
