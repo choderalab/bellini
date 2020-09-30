@@ -59,10 +59,7 @@ class Species(Group):
     def __mul__(self, moles):
         """ Species times quantity equals substance. """
         # check quantity is in mole
-        assert isinstance(
-            moles,
-            Quantity
-        )
+        assert isinstance(moles, Quantity) or isinstance(moles, Distribution)
 
         assert moles.units.dimensionality == ureg.mole.dimensionality
 
@@ -121,7 +118,7 @@ class Substance(Group):
             return x + self
 
     def __mul__(self, x):
-        assert isinstance(x, float)
+        assert isinstance(x, float) or isinstance(x, Distribution)
 
         return Substance(
             self.species,
