@@ -1,7 +1,7 @@
 import pytest
 
 def test_init():
-    from bellini import Substance, Quantity
+    from bellini import Substance, Quantity, Species
     from bellini.distributions import Normal
     import pint
     ureg = pint.UnitRegistry()
@@ -11,4 +11,8 @@ def test_init():
         scale=Quantity(0.1, ureg.mole ** 0.5),
     )
 
-    
+    species = Species(name='water')
+
+    substance = Species * quantity_distribution
+
+    print(substance)
