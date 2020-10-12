@@ -13,6 +13,7 @@ ureg = pint.UnitRegistry()
 # =============================================================================
 # BASE CLASS
 # =============================================================================
+
 class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
 
