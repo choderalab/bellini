@@ -22,7 +22,7 @@ class Story(abc.ABC):
         return self.objects[name]
 
     def __setattr__(self, name, x):
-        if isinstance(x, Group):
+        if isinstance(x, Group) or isinstance(x, Distribution):
             self.objects[name] = x
         super(Story, self).__setattr__(name, x)
 

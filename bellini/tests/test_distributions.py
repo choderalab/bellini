@@ -11,5 +11,5 @@ def test_init():
 
     x = Normal(
         loc=Quantity(0.0, unit='liter'),
-        scale=Quantity(1.0, unit=ureg.liter ** 0.5),
+        scale=Quantity(1.0, unit=ureg.liter),
     )

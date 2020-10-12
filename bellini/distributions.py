@@ -76,6 +76,13 @@ class ComposedDistribution(Distribution):
         self.distributions = distributions
         self.operator = operator
 
+    def __repr__(self):
+        return 'ComposedDistriubution: %s %s %s' % (
+            self.distributions[0],
+            self.operator,
+            self.distributions[1],
+        )
+
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
     def __init__(self, distribution, operator, **kwargs):
@@ -85,6 +92,13 @@ class TransformedDistribution(Distribution):
         for key, value in kwargs:
             setattr(self, key, value)
 
+    def __repr__(self):
+        return 'TransformedDistribution: %s %s with %s' % (
+            self.operator,
+            self.distribution,
+            self.kwargs,
+        )
+
 
 # =============================================================================
 # MODULE CLASSES
@@ -92,7 +106,7 @@ class TransformedDistribution(Distribution):
 class Normal(Distribution):
     """ Normal distribution. """
     def __init__(self, loc, scale):
-        assert loc.dimensionality ** 0.5 == scale.dimensionality
+        assert loc.dimensionality == scale.dimensionality
         super(Normal, self).__init__(loc=loc, scale=scale)
 
     @property
