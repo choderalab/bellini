@@ -16,6 +16,27 @@ class Distribution(abc.ABC):
             assert isinstance(parameter, Quantity)
             setattr(self, name, parameter)
 
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = nx.MultiDiGraph() # distribution always start with a fresh graph
+        g.add_node(self, ntype='distribution')
+        for name, parameter in self.parameters.items():
+            g.add_node(parameter, ntype='parameter', name=name)
+            g.add_edge(
+                parameter,
+                self,
+                etype='is_parameter_of',
+            )
+
+        self._g = g
+        return g
+
+    @property
+    def g(self):
+        if not hasattr(self, '_g'):
+            self._build_graph()
+        return self._g
+
     def __repr__(self):
         return '%s distribution with %s' % (
             self.__class__.__name__,
@@ -38,63 +59,101 @@ class Distribution(abc.ABC):
         raise NotImplementedError
 
     def __add__(self, x):
-        return ComposedDistribution([self, x], operator="add")
+        return ComposedDistribution([self, x], op="add")
 
     def __sub__(self, x):
-        return ComposedDistribution([self, x], operator="sub")
+        return ComposedDistribution([self, x], op="sub")
 
     def __mul__(self, x):
-        return ComposedDistribution([self, x], operator="mul")
+        return ComposedDistribution([self, x], op="mul")
 
     def __div__(self, x):
-        return ComposedDistribution([self, x], operator="div")
+        return ComposedDistribution([self, x], op="div")
 
     def __pow__(self, x):
-        return TransformedDistribution(self, operator="pow", order=x)
+        return TransformedDistribution(self, op="pow", order=x)
 
     def __abs__(self):
-        return TransformedDistribution(self, operator="abs")
+        return TransformedDistribution(self, op="abs")
 
     def exp(self):
         # TODO: re-write math
-        return TransformedDistribution(self, operator="exp")
+        return TransformedDistribution(self, op="exp")
 
     def __exp__(self):
         return self.exp()
 
     def log(self):
         # TODO: re-write math
-        return TransformedDistribution(self, operator="exp")
+        return TransformedDistribution(self, op="exp")
 
     def __log__(self):
         return self.log()
 
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
-    def __init__(self, distributions, operator):
+    def __init__(self, distributions, op):
         super(ComposedDistribution, self).__init__()
+        assert len(distributions) == 2 # two at a time
         self.distributions = distributions
-        self.operator = operator
+        self.op = op
+
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = nx.MultiDiGraph() # distribution always start with a fresh graph
+        g.add_node(self, ntype='composed_distribution', op=self.op)
+        g.add_node(self.distributions[0], ntype='first_distribution')
+        g.add_node(self.distributions[1], ntype='second_distribution')
+        g.add_edge(
+            self.distributions[0],
+            self,
+            etype='is_first_distribution_of',
+        )
+        g.add_edge(
+            self.distributions[1],
+            self,
+            etype='is_second_distribution_of',
+        )
+        g = nx.compose(g, self.distributions[0].g)
+        g = nx.compose(g, self.distributions[1].g)
+        self._g = g
+        return g
 
     def __repr__(self):
         return 'ComposedDistriubution: %s %s %s' % (
             self.distributions[0],
-            self.operator,
+            self.op,
             self.distributions[1],
         )
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
-    def __init__(self, distribution, operator, **kwargs):
+    def __init__(self, distribution, op, **kwargs):
         super(TransformedDistribution, self).__init__()
         self.distribution = distribution
-        self.operator = operator
+        self.op = op
         for key, value in kwargs:
             setattr(self, key, value)
 
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = self.distribution.g.copy() # copy original graph
+        g.add_node(
+            self,
+            ntype="transformed_distribution",
+            op=self.op,
+        )
+        g.add_edge(
+            self.distribution,
+            self,
+            etype="is_base_distribution_of"
+        )
+        self._g = g
+        return g
+
     def __repr__(self):
         return 'TransformedDistribution: %s %s with %s' % (
-            self.operator,
+            self.op,
             self.distribution,
             self.kwargs,
         )
