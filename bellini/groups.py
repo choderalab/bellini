@@ -22,6 +22,34 @@ class Group(abc.ABC):
         self.laws = laws
         self.name = name
 
+    def _build_graph(self):
+        import networkx as nx
+        g = nx.MultiDiGraph() # initialize empty graph
+
+        # loop through values
+        for name, value in self.values.item():
+            g.add_node(
+                value,
+                name=name,
+            )
+
+        for _from, _to, _lamb in self.laws:
+            g.add_edge(
+                getattr(self, _from),
+                getattr(self, _to),
+                law=_lamb,
+            )
+
+        self._g = g
+        return g
+
+    @property
+    def g(self):
+        if not hasattr(self, "_g"):
+            self._build_graph()
+
+        return self._g
+
     def __getattr__(self, name):
         if name in self.values:
             return self.values[name]
