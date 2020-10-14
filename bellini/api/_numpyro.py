@@ -4,8 +4,10 @@
 import numpyro
 import bellini
 
-def story_to_numpyro_model(story):
-    """ Convert a `bellini.Story` to a `numpyro` model. """
+def graph_to_numpyro_model(g):
+    """ Convert a belief graph to a `numpyro` model. """
+    # TODO: `eval` is clearly not the best way to approach this
+    # initialize code
+    _code = []
 
-
-    raise NotImplementedError
+    

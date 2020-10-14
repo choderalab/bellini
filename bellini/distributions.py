@@ -10,8 +10,9 @@ from bellini import Quantity
 # =============================================================================
 class Distribution(abc.ABC):
     """ Base class for distributions. """
-    def __init__(self, **parameters):
+    def __init__(self, observed=False, **parameters):
         self.parameters = parameters
+        self.observed = observed
         for name, parameter in parameters.items():
             assert isinstance(parameter, Quantity)
             setattr(self, name, parameter)

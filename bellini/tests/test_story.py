@@ -51,3 +51,7 @@ def test_pipeline():
         scale=Quantity(0.01, ureg.mole),
     )
     s.combined_water = s.one_water_quantity + s.another_water_quantity
+    s.combined_water.observed = True
+
+    import networkx as nx
+    edges = list(nx.bfs_edges(s.g, source=s.combined_water, reverse=True))
