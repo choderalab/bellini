@@ -54,4 +54,5 @@ def test_pipeline():
     s.combined_water.observed = True
 
     import networkx as nx
-    edges = list(nx.bfs_edges(s.g, source=s.combined_water, reverse=True))
+    edges = list(nx.bfs_edges(s.g, source=s.combined_water, reverse=True))[::-1]
+    print(edges)
