@@ -6,6 +6,18 @@ import bellini
 from bellini import Quantity
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+OPS = {
+    "add": lambda x, y: x + y,
+    "sub": lambda x, y: x - y,
+    "mul": lambda x, y: x * y,
+    "div": lambda x, y: x / y,
+    "exp": lambda x: x.exp(),
+    "log": lambda x: x.log(),
+}
+
+# =============================================================================
 # BASE CLASSES
 # =============================================================================
 class Distribution(abc.ABC):
@@ -91,6 +103,11 @@ class Distribution(abc.ABC):
     def __log__(self):
         return self.log()
 
+
+class SimpleDistribution(Distribution):
+    def __init__(self, *args, **kwargs):
+        super(SimpleDistribution, self).__init__()
+
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
     def __init__(self, distributions, op):
@@ -159,11 +176,10 @@ class TransformedDistribution(Distribution):
             self.kwargs,
         )
 
-
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
-class Normal(Distribution):
+class Normal(SimpleDistribution):
     """ Normal distribution. """
     def __init__(self, loc, scale):
         assert loc.dimensionality == scale.dimensionality

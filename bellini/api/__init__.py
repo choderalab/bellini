@@ -1,1 +1,1 @@
-import _numpyro
+from . import _numpyro

@@ -19,4 +19,5 @@ def test_construct():
     s.combined_water = s.one_water_quantity + s.another_water_quantity
     s.combined_water.observed = True
 
-    
+    from bellini.api._numpyro import graph_to_numpyro_model
+    graph_to_numpyro_model(s.g)
