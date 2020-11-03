@@ -18,6 +18,8 @@ def graph_to_numpyro_model(g):
     nodes = [edge[1] for edge in edges]
 
     def model():
+        idx = 0
+
         for node in nodes:
             if isinstance(node, bellini.distributions.SimpleDistribution):
                 name = str(node)
@@ -29,12 +31,12 @@ def graph_to_numpyro_model(g):
                     if isinstance(parameter, bellini.quantity.Quantity):
                         return parameter._value
                     elif isinstance(parameter, bellini.distributions.Distribution):
-                        return locals()[str(parameter)]
+                        return locals()[str(idx) + str(parameter)]
 
                 parameters = [_apply_parameter(parameter) for parameter in parameters]
 
-                locals()[name] = numpyro.sample(
-                    name,
+                locals()[str(idx) + name] = numpyro.sample(
+                    str(idx) + name,
                     getattr(
                         numpyro.distributions,
                         node.__class__.__name__,
@@ -43,8 +45,18 @@ def graph_to_numpyro_model(g):
                     )
                 )
 
+                idx += 1
+
             if isinstance(model, bellini.distributions.ComposedDistribution):
                 name = str(node)
-                op = node.op
+                op = bellini.distributions.OPS[node.op]
                 distributions = node.distributions
                 assert len(distributions) == 2
+                locals()[str(idx) + name] = op(
+                    distributions[0],
+                    distributions[1],
+                )
+
+                idx += 1
+
+    return model

@@ -20,4 +20,11 @@ def test_construct():
     s.combined_water.observed = True
 
     from bellini.api._numpyro import graph_to_numpyro_model
-    graph_to_numpyro_model(s.g)
+    model = graph_to_numpyro_model(s.g)
+
+    from numpyro.infer.util import initialize_model
+    import jax
+    model_info = initialize_model(
+        jax.random.PRNGKey(2666),
+        model,
+    )
