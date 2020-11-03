@@ -21,6 +21,18 @@ def graph_to_numpyro_model(g):
         for node in nodes:
             if isinstance(node, bellini.distributions.SimpleDistribution):
                 name = str(node)
+
+                # get the parameters of the distribution
+                parameters = node.parameters
+
+                def _apply_parameter(parameter):
+                    if isinstance(parameter, bellini.quantity.Quantity):
+                        return parameter._value
+                    elif isinstance(parameter, bellini.distributions.Distribution):
+                        return locals()[str(parameter)]
+
+                parameters = [_apply_parameter(parameter) for parameter in parameters]
+
                 locals()[name] = numpyro.sample(
                     name,
                     getattr(
