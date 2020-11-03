@@ -28,3 +28,12 @@ def test_construct():
         jax.random.PRNGKey(2666),
         model,
     )
+    from numpyro.infer.hmc import hmc
+    from numpyro.util import fori_collect
+
+    init_kernel, sample_kernel = hmc(model_info.potential_fn, algo='NUTS')
+    hmc_state = init_kernel(model_info.param_info,
+                         trajectory_length=10,
+                         num_warmup=300)
+    samples = fori_collect(0, 500, sample_kernel, hmc_state,
+        transform=lambda state: model_info.postprocess_fn(state.z))
