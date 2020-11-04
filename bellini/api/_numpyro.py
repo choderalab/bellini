@@ -18,45 +18,37 @@ def graph_to_numpyro_model(g):
     nodes = [edge[1] for edge in edges]
 
     def model():
-        idx = 0
-
         for node in nodes:
-            if isinstance(node, bellini.distributions.SimpleDistribution):
-                name = str(node)
 
-                # get the parameters of the distribution
-                parameters = node.parameters
+            if isinstance(node, bellini.distributions.SimpleDistribution):
+                name = node.name
 
                 def _apply_parameter(parameter):
                     if isinstance(parameter, bellini.quantity.Quantity):
-                        return parameter._value
+                        return parameter.magnitude
                     elif isinstance(parameter, bellini.distributions.Distribution):
-                        return locals()[str(idx) + str(parameter)]
+                        return locals()[parameter.name]
 
-                parameters = [_apply_parameter(parameter) for parameter in parameters]
+                parameters = [_apply_parameter(param) for param_name, param in node.parameters.items()]
 
-                locals()[str(idx) + name] = numpyro.sample(
-                    str(idx) + name,
+                locals()[name] = numpyro.sample(
+                    name,
                     getattr(
                         numpyro.distributions,
                         node.__class__.__name__,
                     )(
-                        *[param._value for param in node.parameters],
+                        *parameters,
                     )
                 )
-
-                idx += 1
 
             if isinstance(model, bellini.distributions.ComposedDistribution):
                 name = str(node)
                 op = bellini.distributions.OPS[node.op]
                 distributions = node.distributions
                 assert len(distributions) == 2
-                locals()[str(idx) + name] = op(
+                locals()[name] = op(
                     distributions[0],
                     distributions[1],
                 )
-
-                idx += 1
 
     return model

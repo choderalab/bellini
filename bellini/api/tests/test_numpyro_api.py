@@ -11,13 +11,24 @@ def test_construct():
     s.one_water_quantity = bellini.distributions.Normal(
         loc=Quantity(3.0, ureg.mole),
         scale=Quantity(0.01, ureg.mole),
+        name="first_normal",
     )
     s.another_water_quantity = bellini.distributions.Normal(
         loc=Quantity(3.0, ureg.mole),
         scale=Quantity(0.01, ureg.mole),
+        name="second_normal",
     )
     s.combined_water = s.one_water_quantity + s.another_water_quantity
-    s.combined_water.observed = True
+    # s.combined_water.observed = True
+    s.combined_water.name = "combined_water"
+
+    s.combined_water_with_nose = bellini.distributions.Normal(
+        loc=s.combined_water,
+        scale=Quantity(0.01, ureg.mole),
+        name="combined_with_noise"
+    )
+
+    s.combined_water_with_nose.observed = True
 
     from bellini.api._numpyro import graph_to_numpyro_model
     model = graph_to_numpyro_model(s.g)
@@ -37,3 +48,5 @@ def test_construct():
                          num_warmup=300)
     samples = fori_collect(0, 500, sample_kernel, hmc_state,
         transform=lambda state: model_info.postprocess_fn(state.z))
+
+    print(samples)

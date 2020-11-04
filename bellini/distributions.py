@@ -22,12 +22,25 @@ OPS = {
 # =============================================================================
 class Distribution(abc.ABC):
     """ Base class for distributions. """
-    def __init__(self, observed=False, **parameters):
+    def __init__(self, observed=False, name=None, **parameters):
         self.parameters = parameters
         self.observed = observed
+        self._name = name
         for name, parameter in parameters.items():
-            assert isinstance(parameter, Quantity)
+            # assert isinstance(parameter, Quantity)
             setattr(self, name, parameter)
+
+    @property
+    def name(self):
+        if self._name is not None:
+            return self._name
+        else:
+            return self.__repr__()
+
+    @name.setter
+    def name(self, x):
+        assert isinstance(x, str)
+        self._name = x
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -63,11 +76,11 @@ class Distribution(abc.ABC):
             )
         )
 
-    @property
+    @abc.abstractproperty
     def dimensionality(self):
         raise NotImplementedError
 
-    @property
+    @abc.abstractproperty
     def magnitude(self):
         raise NotImplementedError
 
@@ -106,7 +119,7 @@ class Distribution(abc.ABC):
 
 class SimpleDistribution(Distribution):
     def __init__(self, *args, **kwargs):
-        super(SimpleDistribution, self).__init__()
+        super(SimpleDistribution, self).__init__(**kwargs)
 
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
@@ -115,6 +128,17 @@ class ComposedDistribution(Distribution):
         assert len(distributions) == 2 # two at a time
         self.distributions = distributions
         self.op = op
+
+    @property
+    def magnitude(self):
+        return OPS[self.op](
+            self.distributions[0].magnitude,
+            self.distributions[1].magnitude,
+        )
+
+    @property
+    def dimensionality(self):
+        return self.distributions[0].dimensionality
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -139,10 +163,12 @@ class ComposedDistribution(Distribution):
 
     def __repr__(self):
         return 'ComposedDistriubution: %s %s %s' % (
-            self.distributions[0],
+            self.distributions[0].name,
             self.op,
-            self.distributions[1],
+            self.distributions[1].name,
         )
+
+
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
@@ -172,7 +198,7 @@ class TransformedDistribution(Distribution):
     def __repr__(self):
         return 'TransformedDistribution: %s %s with %s' % (
             self.op,
-            self.distribution,
+            self.distribution.name,
             self.kwargs,
         )
 
@@ -181,9 +207,9 @@ class TransformedDistribution(Distribution):
 # =============================================================================
 class Normal(SimpleDistribution):
     """ Normal distribution. """
-    def __init__(self, loc, scale):
+    def __init__(self, loc, scale, **kwargs):
         assert loc.dimensionality == scale.dimensionality
-        super(Normal, self).__init__(loc=loc, scale=scale)
+        super(Normal, self).__init__(loc=loc, scale=scale, **kwargs)
 
     @property
     def dimensionality(self):
