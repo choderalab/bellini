@@ -84,6 +84,10 @@ class Distribution(abc.ABC):
     def magnitude(self):
         raise NotImplementedError
 
+    @abc.abstractproperty
+    def units(self):
+        raise NotImplementedError
+
     def __add__(self, x):
         return ComposedDistribution([self, x], op="add")
 
@@ -140,6 +144,10 @@ class ComposedDistribution(Distribution):
     def dimensionality(self):
         return self.distributions[0].dimensionality
 
+    @property
+    def units(self):
+        return self.distributions[0].units
+
     def _build_graph(self):
         import networkx as nx # local import
         g = nx.MultiDiGraph() # distribution always start with a fresh graph
@@ -167,8 +175,6 @@ class ComposedDistribution(Distribution):
             self.op,
             self.distributions[1].name,
         )
-
-
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
@@ -218,3 +224,7 @@ class Normal(SimpleDistribution):
     @property
     def magnitude(self):
         return self.loc.magnitude
+
+    @property
+    def units(self):
+        return self.loc.units

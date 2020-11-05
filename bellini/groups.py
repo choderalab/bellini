@@ -20,25 +20,58 @@ class Group(abc.ABC):
     def __init__(self, name=None, laws=None, **values):
         self.values = values
         self.laws = laws
-        self.name = name
+        self._name = name
+
+    @property
+    def name(self):
+        if self._name is not None:
+            return self._name
+        else:
+            return repr(self)
+
+    @name.setter
+    def name(self, x):
+        assert isinstance(x, str)
+        self._name = x
 
     def _build_graph(self):
         import networkx as nx
+
         g = nx.MultiDiGraph() # initialize empty graph
 
         # loop through values
-        for name, value in self.values.item():
+        for name, value in self.values.items():
+            print(value)
+
             g.add_node(
                 value,
                 name=name,
             )
 
-        for _from, _to, _lamb in self.laws:
-            g.add_edge(
-                getattr(self, _from),
-                getattr(self, _to),
-                law=_lamb,
-            )
+        # NOTE:
+        # certain quantities are independent, some are dependent
+
+        # TODO: # from JDC
+        # bake that in!!!
+
+        # TODO: # from JDC
+        # support the other case, to support reactions
+        # mass conservation
+        # equilibrium ratio
+
+
+        # three different
+        # simple concentration
+        # equilibirium conc, multiple conc. -> multiple conc. # with
+        # observation model
+
+        if self.laws is not None:
+            for _from, _to, _lamb in self.laws:
+                g.add_edge(
+                    getattr(self, _from),
+                    getattr(self, _to),
+                    law=_lamb,
+                )
 
         self._g = g
         return g
@@ -48,6 +81,10 @@ class Group(abc.ABC):
         if not hasattr(self, "_g"):
             self._build_graph()
 
+        if hasattr(self, "_g"):
+            if self._g is None:
+                self._build_graph()
+
         return self._g
 
     def __getattr__(self, name):
@@ -55,11 +92,7 @@ class Group(abc.ABC):
             return self.values[name]
 
         else:
-            AttributeError(
-                "%s has no attribute %s" % (
-                    self.__class__.__name__,
-                    name,
-                ))
+            super(Group, self).__getattribute__(name)
 
     def __eq__(self, new_group):
         return {
@@ -112,11 +145,6 @@ class Substance(Group):
             Species,
         )
 
-        assert isinstance(
-            moles,
-            Quantity,
-        )
-
         super(Substance, self).__init__(
             species=species,
             moles=moles,
@@ -160,7 +188,7 @@ class Substance(Group):
 class Mixture(Group):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
-        super(Mixture, self).__init__(substances=set(substances), **values)
+        super(Mixture, self).__init__(substances=tuple(set(substances)), **values)
 
     def __repr__(self):
         return ' and '.join([str(x) for x in self.substances])
@@ -210,4 +238,4 @@ class Mixture(Group):
             return mixture
 
     def __eq__(self, x):
-        return self.substances == self.substances
+        return list(set(self.substances)) == list(set(self.substances))

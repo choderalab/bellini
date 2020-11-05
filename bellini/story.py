@@ -10,6 +10,9 @@ from collections import OrderedDict
 # MODULE CLASSES
 # =============================================================================
 class Story(abc.ABC):
+    # TODO # from JDC
+    # rename
+    
     """ A procedure that involves groups, quantities, and distributions. """
     def __init__(self):
         super(Story, self).__init__()
@@ -22,7 +25,7 @@ class Story(abc.ABC):
         if name in self.objects:
             return self.objects[name]
         else:
-            super(Story, self).__getattr__(self, name)
+            super(Story, self).__getattribute__(name)
 
     def __setattr__(self, name, x):
         if isinstance(x, Group) or isinstance(x, Distribution):
@@ -43,6 +46,10 @@ class Story(abc.ABC):
         import networkx as nx
         g = nx.MultiDiGraph()
         for name, x in self.objects.items():
+            print(name)
+            print(x)
+            print(type(x))
+
             g = nx.compose(g, x.g)
         self._g = g
         return g
