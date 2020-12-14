@@ -41,7 +41,6 @@ class Group(abc.ABC):
 
         # loop through values
         for name, value in self.values.items():
-            print(value)
 
             g.add_node(
                 value,
@@ -58,7 +57,6 @@ class Group(abc.ABC):
         # support the other case, to support reactions
         # mass conservation
         # equilibrium ratio
-
 
         # three different
         # simple concentration
@@ -109,6 +107,14 @@ class Group(abc.ABC):
                 new_values = law(self)
                 for name, value in new_values:
                     setattr(self, name, value)
+
+    def add_law(self, law):
+        assert len(law) == 3
+        _from, _to, _lamb = law
+        assert isinstance(_from, str)
+        assert isinstance(_to, str)
+        assert isinstance(_lamb, str)
+        self.laws.append(law)
 
 # =============================================================================
 # SUBCLASSES
