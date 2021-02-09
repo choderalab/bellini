@@ -15,10 +15,10 @@ class NodeBase(abc.ABC):
 # MODULE CLASSES
 # =============================================================================
 class Node(NodeBase):
-    def __init__(self):
+    def __init__(self, children={}, relations=[]):
         super(Node, self).__init__()
-        self.children = {}
-        self.relations = []
+        self.children = children
+        self.relations = relations
 
     def __getattr__(self, name):
         # allow children to be accessed by `__getattr__`
@@ -27,5 +27,3 @@ class Node(NodeBase):
 
         else:
             super(Node, self).__getattribute__(name)
-
-    
