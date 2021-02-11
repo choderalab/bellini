@@ -24,20 +24,26 @@ class Species(Node):
         assert isinstance(x, Distribution)
         return Substance(self, x)
 
+    def __repr__(self):
+        return self.name
+
 class Substance(Node):
     def __init__(self, species, x):
         super(Substance, self).__init__()
         assert isinstance(species, Species)
         assert isinstance(x, Distribution)
         assert x.unit == ureg.mole
-        self.children = {"species": species, "x": x}
+        self.parents = {"species": species, "x": x}
 
     def __eq__(self, other):
         if not isinstance(other, Substance):
             return False
         return self.species == other.species and self.x == other.x
 
-class Mixture(abc.ABC):
+    def __repr__(self):
+        return "%s * %s" % (self.x, self.species)
+
+class Mixture(Node):
     def __init__(self, substances):
         super(Mixture, self).__init__()
         assert len(
@@ -48,6 +54,7 @@ class Mixture(abc.ABC):
             assert isinstance(substance, Substance)
             self.children[substance.name] = substance.x
 
-class FixedDensitySolution(abc.ABC):
-    def __init__(self):
-        pass
+        self.substances = substances
+
+    def __repr__(self):
+        return "+".join(self.substances)

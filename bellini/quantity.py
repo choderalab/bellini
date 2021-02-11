@@ -3,7 +3,6 @@
 # =============================================================================
 import pint
 import numpy as np
-import torch
 
 # =============================================================================
 # MODULE CLASSES
@@ -20,10 +19,8 @@ class Quantity(pint.quantity.Quantity):
             return x
         if isinstance(x, np.ndarray):
             return x
-        if isinstance(x, torch.Tensor):
-            # TODO:
-            # do not require torch import ahead of time
-            return x.numpy()
+        else:
+            return np.array(x)
 
     def __new__(self, value, unit, name=None):
         value = self._convert_to_numpy(value)

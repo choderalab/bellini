@@ -2,8 +2,8 @@
 # IMPORTS
 # =============================================================================
 import abc
-import bellini
-from bellini import Quantity
+from .node import Node
+from .quantity import Quantity
 
 # =============================================================================
 # CONSTANTS
@@ -20,9 +20,10 @@ OPS = {
 # =============================================================================
 # BASE CLASSES
 # =============================================================================
-class Distribution(abc.ABC):
+class Distribution(Node):
     """ Base class for distributions. """
     def __init__(self, **parameters):
+        super(Distribution, self).__init__()
         for key, value in parameters.items():
             self.key = value
 
@@ -63,8 +64,17 @@ class Distribution(abc.ABC):
         return TransformedDistribution(self, op="log")
 
 class SimpleDistribution(Distribution):
-    def __init__(self, *args, **kwargs):
-        super(SimpleDistribution, self).__init__(**kwargs)
+    def __init__(self, **kwargs):
+        super(SimpleDistribution, self).__init__()
+        self.kwargs = kwargs
+        for key, value in kwargs.items():
+            self.key = value
+
+    def __repr__(self):
+        return "%s with %s" % (
+            self.__class__.__name__,
+            self.kwargs
+        )
 
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
@@ -73,6 +83,18 @@ class ComposedDistribution(Distribution):
         assert len(distributions) == 2 # two at a time
         self.distributions = distributions
         self.op = op
+        self.children = {
+            "child0": distributions[0],
+            "child1": distributions[1]
+        }
+        self.relations = [
+            lambda node: {"parent": OPS[self.op](
+                node.child0, node.child1,
+            )}
+        ]
+
+    def __repr__(self):
+        return repr(self.distribution[0]) + self.op + repr(self.distributions[1])
 
     @property
     def magnitude(self):
@@ -86,17 +108,43 @@ class ComposedDistribution(Distribution):
         return self.distributions[0].dimensionality
 
     @property
-    def units(self):
-        return self.distributions[0].units
+    def unit(self):
+        return self.distributions[0].unit
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
-    def __init__(self, distribution, op, **kwargs):
+    def __init__(self, distribution, op):
         super(TransformedDistribution, self).__init__()
         self.distribution = distribution
         self.op = op
-        for key, value in kwargs:
-            setattr(self, key, value)
+        self.children = {
+            "child0": distribution
+        }
+        self.relations = [
+            lambda node: {"parent": OPS[self.op](node["child0"])}
+        ]
+
+    def __repr__(self):
+        return self.op + str(self.distribution)
+
+    @property
+    def magnitude(self):
+        return OPS[self.op](
+            self.distribution.magnitude,
+        )
+
+    @property
+    def dimensionality(self):
+        return OPS[self.op](
+            self.distribution.dimensionality
+        )
+
+    @property
+    def unit(self):
+        return OPS[self.op](
+            self.distribution.unit
+        )
+
 
 # =============================================================================
 # MODULE CLASSES
@@ -104,7 +152,7 @@ class TransformedDistribution(Distribution):
 class Delta(SimpleDistribution):
     """ Degenerate discrete distribution. (A single point). """
     def __init__(self, x):
-        self.x = x
+        super(Delta, self).__init__(x=x)
 
     @property
     def dimensionality(self):
