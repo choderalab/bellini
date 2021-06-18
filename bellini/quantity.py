@@ -1,17 +1,16 @@
 # =============================================================================
 # IMPORTS
 # =============================================================================
-import pint
+#import pint
 import numpy as np
 import torch
-
+from bellini.units import *
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
 class Quantity(pint.quantity.Quantity):
     """ A class that describes physical quantity, which contains
     numeric value and units.
-
     """
 
     @staticmethod
@@ -31,3 +30,16 @@ class Quantity(pint.quantity.Quantity):
             name = repr(self)
         self.name = name
         return super(Quantity, self).__new__(self, value, unit)
+
+    def _build_graph(self):
+        import networkx as nx
+        g = nx.MultiDiGraph()
+        g.add_node(self, ntype='quantity', name=self.name)
+        self._g = g
+        return g
+
+    @property
+    def g(self):
+        if not hasattr(self, '_g'):
+            self._build_graph()
+        return self._g

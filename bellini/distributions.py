@@ -97,7 +97,7 @@ class Distribution(abc.ABC):
     def __mul__(self, x):
         return ComposedDistribution([self, x], op="mul")
 
-    def __div__(self, x):
+    def __truediv__(self, x):
         return ComposedDistribution([self, x], op="div")
 
     def __pow__(self, x):
@@ -115,7 +115,7 @@ class Distribution(abc.ABC):
 
     def log(self):
         # TODO: re-write math
-        return TransformedDistribution(self, op="exp")
+        return TransformedDistribution(self, op="log")
 
     def __log__(self):
         return self.log()
@@ -170,7 +170,7 @@ class ComposedDistribution(Distribution):
         return g
 
     def __repr__(self):
-        return 'ComposedDistriubution: %s %s %s' % (
+        return 'ComposedDistriubution: (%s %s %s)' % (
             self.distributions[0].name,
             self.op,
             self.distributions[1].name,
@@ -202,7 +202,7 @@ class TransformedDistribution(Distribution):
         return g
 
     def __repr__(self):
-        return 'TransformedDistribution: %s %s with %s' % (
+        return 'TransformedDistribution: (%s %s with %s)' % (
             self.op,
             self.distribution.name,
             self.kwargs,

@@ -8,7 +8,8 @@ import torch
 import bellini
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution
-ureg = pint.UnitRegistry()
+from bellini.units import *
+#ureg = pint.UnitRegistry()
 
 # =============================================================================
 # BASE CLASS
@@ -39,6 +40,7 @@ class Group(abc.ABC):
 
         g = nx.MultiDiGraph() # initialize empty graph
 
+        """
         # loop through values
         for name, value in self.values.items():
 
@@ -46,6 +48,20 @@ class Group(abc.ABC):
                 value,
                 name=name,
             )
+        """
+        for name, value in self.values.items():
+            if isinstance(value, list):
+                for v in value:
+                    g.add_node(
+                        v,
+                        name=name
+                    )
+            else:
+                g.add_node(
+                    value,
+                    name=name
+                )
+
 
         # NOTE:
         # certain quantities are independent, some are dependent
@@ -119,6 +135,7 @@ class Group(abc.ABC):
 # =============================================================================
 # SUBCLASSES
 # =============================================================================
+
 class Species(Group):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
@@ -142,8 +159,9 @@ class Species(Group):
     def __hash__(self):
         return hash(self.name)
 
+
 class Substance(Group):
-    """ A chemical substance with species and quantities. """
+    """ A chemical substance with species and number of moles. """
     def __init__(self, species, moles, **values):
         # check the type of species
         assert isinstance(
@@ -179,6 +197,8 @@ class Substance(Group):
 
         elif isinstance(x, Mixture):
             return x + self
+        else:
+            raise InvalidArgumentError()
 
     def __mul__(self, x):
         assert isinstance(x, float) or isinstance(x, Distribution)
@@ -190,6 +210,74 @@ class Substance(Group):
 
     def __hash__(self):
         return hash(self.moles.magnitude) + hash(self.species)
+
+
+class Solvent(Group):
+    """ A chemical substance with species and volume. """
+    def __init__(self, species, volume, **values):
+        # check the type of species
+        assert isinstance(
+            species,
+            Species,
+        )
+
+        super(Solvent, self).__init__(
+            species=species,
+            volume=volume,
+            **values
+        )
+
+    def __repr__(self):
+        return '%s of %s' % (str(self.volume), str(self.species))
+
+    def __add__(self, x):
+
+        if isinstance(x, Solvent):
+            if x.species == self.species:
+                return Solvent(
+                    self.species,
+                    self.volume + x.volume
+                )
+
+            else:
+                return Mixture(
+                    [
+                        self,
+                        x,
+                    ]
+                )
+
+        elif isinstance(x, Mixture):
+            return x + self
+        else:
+            raise InvalidArgumentError()
+
+    def __mul__(self, x):
+        assert isinstance(x, float) or isinstance(x, Distribution)
+
+        return Substance(
+            self.species,
+            x * self.volume,
+        )
+
+    def __hash__(self):
+        return hash(self.volume.magnitude) + hash(self.species)
+
+    def aliquot(self, volume):
+        """ Removes an aliquot and returns it """
+        #assert volume.units == VOLUME_UNIT
+
+        new_volume = self.volume - volume
+
+        aliquot = Solvent(
+            species=self.species,
+            volume=volume
+        )
+
+        self.volume = self.volume - volume
+
+        return aliquot
+
 
 class Mixture(Group):
     """ A simple mixture of substances. """
@@ -245,3 +333,109 @@ class Mixture(Group):
 
     def __eq__(self, x):
         return list(set(self.substances)) == list(set(self.substances))
+
+
+class Solution(Group):
+    def __init__(self, substance, solvent, **values):
+        # check the type of substance and solvent
+        assert isinstance(
+            substance,
+            Substance,
+        )
+        assert isinstance(
+            solvent,
+            Solvent
+        )
+
+        super(Solution, self).__init__(
+            substance=substance,
+            solvent=solvent,
+            **values
+        )
+
+    @property
+    def moles(self):
+        return self.substance.moles
+
+    @property
+    def volume(self):
+        return self.solvent.volume
+
+    @property
+    def concentration(self):
+        return (self.substance.moles / self.solvent.volume)
+
+    def __repr__(self):
+        return f"{self.concentration} of {self.substance.species} in {self.solvent}"
+
+    def __add__(self, x):
+        if isinstance(x, Solvent):
+            assert self.solvent.species == x.species, "currently don't suppose mixed solvent solutions"
+            return Solution(
+                substance = self.substance,
+                solvent = self.solvent + x
+            )
+        elif isinstance(x, Solution):
+            assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
+            return Solution(
+                substance = self.substance + x.substance,
+                solvent = self.solvent + x.solvent
+            )
+        else:
+            raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
+
+    def __mul__(self, x):
+        assert isinstance(x, float)
+
+        return Solution(
+            substance = x * self.substance,
+            solvent = x * self.solvent,
+        )
+
+    def aliquot(self, volume):
+        """ Removes an aliquot and returns it """
+        #assert volume.units == VOLUME_UNIT
+
+        new_volume = self.volume - volume
+
+        aliquot_substance = Substance(
+            species=self.substance.species,
+            moles=self.concentration * volume
+        )
+
+        aliquot_solvent = self.solvent.aliquot(volume)
+
+        aliquot = Solution(
+            substance = aliquot_substance,
+            solvent = aliquot_solvent
+        )
+
+        self.substance = Substance(
+            species=self.substance.species,
+            moles=self.concentration * new_volume
+        )
+
+        return aliquot
+
+
+class Well(Group):
+    """ Simple container for a solution """
+    def __init__(self, solution=None, **values):
+        super(Well, self).__init__(solution = solution, **values)
+
+    def retrieve_aliquot(self, volume):
+        """ Removes an aliquot and returns it """
+        assert self.solution is not None
+        return self.solution.aliquot(volume)
+
+    def recieve_aliquot(self, solution):
+        if self.solution is not None:
+            self.solution = self.solution + solution
+        else:
+            self.solution = solution
+
+    def __repr__(self):
+        return f"Well containing {self.solution}"
+
+    def observe(self, value):
+        return getattr(self.solution, value)

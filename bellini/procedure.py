@@ -9,13 +9,11 @@ from collections import OrderedDict
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
-class Story(abc.ABC):
-    # TODO # from JDC
-    # rename
-    
+class Procedure(abc.ABC):
+
     """ A procedure that involves groups, quantities, and distributions. """
     def __init__(self):
-        super(Story, self).__init__()
+        super(Procedure, self).__init__()
         self.objects = OrderedDict()
 
     def register(self, name, x):
@@ -25,12 +23,12 @@ class Story(abc.ABC):
         if name in self.objects:
             return self.objects[name]
         else:
-            super(Story, self).__getattribute__(name)
+            super(Procedure, self).__getattribute__(name)
 
     def __setattr__(self, name, x):
         if isinstance(x, Group) or isinstance(x, Distribution):
             self.register(name, x)
-        super(Story, self).__setattr__(name, x)
+        super(Procedure, self).__setattr__(name, x)
 
     def __getitem__(self, name):
         return self.objects[name]
@@ -40,7 +38,7 @@ class Story(abc.ABC):
             self.register(name, x)
 
     def __repr__(self):
-        return 'Story containinig %s' % str(self.objects)
+        return 'Procedure containinig %s' % str(self.objects)
 
     def _build_graph(self):
         import networkx as nx
