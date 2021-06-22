@@ -27,50 +27,47 @@ class Dispenser(Actionable):
     """ Dispense an amount of liquid from one container to another with Gaussian error """
     def __init__(self, name, var):
         """
-        We allow Quantity as a variance if the error of the dispensing device is known
-        Otherwise, var can be a distribution which serves as a prior (must be positive RV)
+        TODO: allow variance to be drawn from a prior
         """
 
         #assert var.units == VOLUME_UNIT
 
         if isinstance(var, Quantity):
             self.var = var
-            self.noise_model = Normal(0 * VOLUME_UNIT, var)
-        elif isinstance(var, Distribution):
-            self.var = var
-            self.noise_model = Normal(0 * VOLUME_UNIT, 1  * VOLUME_UNIT) * var
         else:
-            raise InvalidArgumentError("var must be either a Quantity or a Distribution")
+            raise ValueError("var must be either a Quantity")
 
         self.name = name
+        self.dispense_count = 0
 
-    def apply(self, parent_node, child_node, volume):
-        drawn_volume = self.noise_model + volume
+    def apply(self, parent_node, child_node, volume, parent_final_name=None, child_final_name=None):
+        drawn_volume = Normal(volume, self.var)
+        drawn_volume.name = f"vol_transfer_{drawn_volume.name}_{self.dispense_count}"
+        self.dispense_count += 1
         aliquot = parent_node.retrieve_aliquot(drawn_volume)
         child_node.recieve_aliquot(aliquot)
+
+
 
 class Measurer(Actionable):
     """ Measure a property of one container with Gaussian error """
     def __init__(self, name, var):
         """
-        We allow Quantity as a variance if the error of the dispensing device is known
-        Otherwise, var can be a distribution which serves as a prior (must be positive RV)
+        TODO: allow variance to be drawn from a prior, update name for multiple
+        measurements
         """
-
-        #assert var.units == VOLUME_UNIT
 
         if isinstance(var, Quantity):
             self.var = var
-            self.noise_model = Normal(0 * var.units, var)
-        elif isinstance(var, Distribution):
-            self.var = var
-            self.noise_model = Normal(0 * var.units, 1  * var.units) * var
         else:
-            raise InvalidArgumentError("var must be either a Quantity or a Distribution")
+            raise ValueError("var must be a Quantity")
 
         self.name = name
+        self.measure_count = 0
 
     def apply(self, parent_node, value):
-        measurement = self.noise_model + parent_node.observe(value)
+        measurement = Normal(parent_node.observe(value), self.var)
+        measurement.name = f"measurement_{parent_node}_{value}_{self.measure_count}"
+        self.measure_count += 1
         measurement.observed = True
         return measurement
