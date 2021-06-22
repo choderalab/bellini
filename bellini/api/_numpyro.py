@@ -20,7 +20,7 @@ def graph_to_numpyro_model(g):
     make for a more intuitive interface.
 
     note: doesn't actually use the explicit nx graph, instead uses implicit
-    param graph? need to think about design 
+    param graph? need to think about design
     """
     import networkx as nx
     observed_nodes = [node for node in g.nodes if hasattr(node, "observed")]
@@ -79,12 +79,31 @@ def graph_to_numpyro_model(g):
                     for param in distributions:
                         eval(param)
 
-                    #print([_process_parameter(d) for d in distributions])
                     assert len(distributions) == 2
                     sample = op(
                         model_dict[distributions[0]].magnitude,
                         model_dict[distributions[1]].magnitude,
                     )
+
+                    model_dict[node] = bellini.quantity.Quantity(
+                        sample,
+                        node.units,
+                    )
+
+                elif isinstance(node, bellini.distributions.TransformedDistribution):
+                    name = node.name
+                    op = bellini.distributions.OPS[node.op]
+                    eval(node.distribution)
+
+                    if op == 'pow':
+                        sample = op(
+                            model_dict[node.distribution.magnitude],
+                            node.order
+                        )
+                    else:
+                        sample = op(
+                            model_dict[node.distribution.magnitude]
+                        )
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
