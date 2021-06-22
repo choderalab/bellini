@@ -5,6 +5,7 @@
 import numpy as np
 import jax.numpy as jnp
 import torch
+import bellini.distributions as dist
 from bellini.units import *
 # =============================================================================
 # MODULE CLASSES
@@ -47,3 +48,27 @@ class Quantity(pint.quantity.Quantity):
         if not hasattr(self, '_g'):
             self._build_graph()
         return self._g
+
+    def __add__(self, x):
+        if isinstance(x, dist.Distribution):
+            return x + self
+        else:
+            return super(Quantity, self).__add__(x)
+
+    def __sub__(self, x):
+        if isinstance(x, dist.Distribution):
+            return -x + self
+        else:
+            return super(Quantity, self).__sub__(x)
+
+    def __mul__(self, x):
+        if isinstance(x, dist.Distribution):
+            return x * self
+        else:
+            return super(Quantity, self).__mul__(x)
+
+    def __truediv__(self, x):
+        if isinstance(x, dist.Distribution):
+            return (x ** -1) * self
+        else:
+            return super(Quantity, self).__truediv__(x)

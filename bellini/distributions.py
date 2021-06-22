@@ -3,7 +3,6 @@
 # =============================================================================
 import abc
 import bellini
-from bellini import Quantity
 
 # =============================================================================
 # CONSTANTS
@@ -15,6 +14,8 @@ OPS = {
     "div": lambda x, y: x / y,
     "exp": lambda x: x.exp(),
     "log": lambda x: x.log(),
+    "neg": lambda x: -x,
+    "pow": lambda x, y: x ** y,
 }
 
 # =============================================================================
@@ -104,6 +105,9 @@ class Distribution(abc.ABC):
 
     def __sub__(self, x):
         return ComposedDistribution([self, x], op="sub")
+
+    def __neg__(self):
+        return TransformedDistribution(self, op='neg')
 
     def __mul__(self, x):
         return ComposedDistribution([self, x], op="mul")
@@ -210,7 +214,7 @@ class TransformedDistribution(Distribution):
         super(TransformedDistribution, self).__init__()
         self.distribution = distribution
         self.op = op
-        for key, value in kwargs:
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def _build_graph(self):
@@ -235,6 +239,30 @@ class TransformedDistribution(Distribution):
             self.distribution.name,
             self.kwargs,
         )
+
+    @property
+    def magnitude(self):
+        return OPS[self.op](
+            self.distribution
+        )
+
+    @property
+    def dimensionality(self):
+        if self.op == "neg":
+            return self.distribution.dimensionality
+        elif self.op == "pow":
+            return self.distribution.dimensionality ** self.order
+        else:
+            raise NotImplementedError("computing dimensionality for given operation not supported")
+
+    @property
+    def units(self):
+        if self.op == "neg":
+            return self.distribution.units
+        elif self.op == "pow":
+            return self.distribution.units ** self.order
+        else:
+            raise NotImplementedError("computing units for given operation not supported")
 
 # =============================================================================
 # MODULE CLASSES
