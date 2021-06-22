@@ -264,19 +264,20 @@ class Solvent(Group):
         return hash(self.volume.magnitude) + hash(self.species)
 
     def aliquot(self, volume):
-        """ Removes an aliquot and returns it """
+        """ Split into aliquot and source """
         #assert volume.units == VOLUME_UNIT
-
-        new_volume = self.volume - volume
 
         aliquot = Solvent(
             species=self.species,
             volume=volume
         )
 
-        self.volume = self.volume - volume
+        source = Solvent(
+            species=self.species,
+            volume=self.volume - volume
+        )
 
-        return aliquot
+        return aliquot, source
 
 
 class Mixture(Group):
@@ -363,7 +364,9 @@ class Solution(Group):
 
     @property
     def concentration(self):
-        return (self.substance.moles / self.solvent.volume)
+        if getattr(self, "_concentration", None) != (self.substance.moles / self.solvent.volume):
+            self._concentration = (self.substance.moles / self.solvent.volume)
+        return self._concentration
 
     def __repr__(self):
         return f"{self.concentration} of {self.substance.species} in {self.solvent}"
@@ -403,19 +406,24 @@ class Solution(Group):
             moles=self.concentration * volume
         )
 
-        aliquot_solvent = self.solvent.aliquot(volume)
+        aliquot_solvent, source_solvent = self.solvent.aliquot(volume)
 
         aliquot = Solution(
             substance = aliquot_substance,
             solvent = aliquot_solvent
         )
 
-        self.substance = Substance(
+        source_substance = Substance(
             species=self.substance.species,
             moles=self.concentration * new_volume
         )
 
-        return aliquot
+        source = Solution(
+            substance = source_substance,
+            solvent = source_solvent
+        )
+
+        return aliquot, source
 
 
 class Well(Group):
@@ -425,8 +433,10 @@ class Well(Group):
 
     def retrieve_aliquot(self, volume):
         """ Removes an aliquot and returns it """
-        assert self.solution is not None
-        return self.solution.aliquot(volume)
+        assert self.solution is not None # TODO: check that volume is enough to remove an aliquot
+        aliquot, source = self.solution.aliquot(volume)
+        self.solution = source
+        return aliquot
 
     def recieve_aliquot(self, solution):
         if self.solution is not None:
