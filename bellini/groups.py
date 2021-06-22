@@ -198,7 +198,7 @@ class Substance(Group):
         elif isinstance(x, Mixture):
             return x + self
         else:
-            raise InvalidArgumentError()
+            raise ValueError("Can only add Mixture or Substance to Substance")
 
     def __mul__(self, x):
         assert isinstance(x, float) or isinstance(x, Distribution)
@@ -250,7 +250,7 @@ class Solvent(Group):
         elif isinstance(x, Mixture):
             return x + self
         else:
-            raise InvalidArgumentError()
+            raise ValueError("Can only add Solvent or Mixture to Ssolvent")
 
     def __mul__(self, x):
         assert isinstance(x, float) or isinstance(x, Distribution)
