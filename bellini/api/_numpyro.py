@@ -85,6 +85,9 @@ def graph_to_numpyro_model(g):
                         model_dict[distributions[1]].magnitude,
                     )
 
+                    if getattr(node, "trace", None):
+                        numpyro.deterministic(node.name, sample)
+
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
@@ -104,6 +107,9 @@ def graph_to_numpyro_model(g):
                         sample = op(
                             model_dict[node.distribution.magnitude]
                         )
+
+                    if getattr(node, "trace", None):
+                        numpyro.deterministic(node.name, sample)
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
