@@ -47,12 +47,23 @@ class Distribution(abc.ABC):
         g = nx.MultiDiGraph() # distribution always start with a fresh graph
         g.add_node(self, ntype='distribution')
         for name, parameter in self.parameters.items():
-            g.add_node(parameter, ntype='parameter', name=name)
-            g.add_edge(
-                parameter,
-                self,
-                etype='is_parameter_of',
-            )
+
+            if isinstance(parameter, Distribution):
+                g.add_node(parameter, ntype='parameter')
+                g.add_edge(
+                    parameter,
+                    self,
+                    etype='is_parameter_of',
+                )
+                g = nx.compose(g, parameter.g)
+
+            else:
+                g.add_node(parameter, ntype='parameter', name=name)
+                g.add_edge(
+                    parameter,
+                    self,
+                    etype='is_parameter_of',
+                )
 
         self._g = g
         return g
@@ -142,11 +153,25 @@ class ComposedDistribution(Distribution):
 
     @property
     def dimensionality(self):
-        return self.distributions[0].dimensionality
+        if self.op == "add" or self.op == "sub":
+            return self.distributions[0].dimensionality
+        elif self.op == "mul":
+            return self.distributions[0].dimensionality * self.distributions[1].dimensionality
+        elif self.op == "div":
+            return self.distributions[0].dimensionality / self.distributions[1].dimensionality
+        else:
+            raise Exception("cannot compute dimensionality for given operation")
 
     @property
     def units(self):
-        return self.distributions[0].units
+        if self.op == "add" or self.op == "sub":
+            return self.distributions[0].units
+        elif self.op == "mul":
+            return self.distributions[0].units * self.distributions[1].units
+        elif self.op == "div":
+            return self.distributions[0].units / self.distributions[1].units
+        else:
+            raise Exception("cannot compute units for given operation")
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -170,11 +195,14 @@ class ComposedDistribution(Distribution):
         return g
 
     def __repr__(self):
-        return 'ComposedDistriubution: (%s %s %s)' % (
-            self.distributions[0].name,
-            self.op,
-            self.distributions[1].name,
-        )
+        if bellini.verbose:
+            return 'ComposedDistriubution: (%s %s %s)' % (
+                repr(self.distributions[0].name),
+                self.op,
+                repr(self.distributions[1]),
+            )
+        else:
+            return f'CompDist w mag {self.magnitude:.2f} {self.units:~P}'
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
@@ -228,3 +256,19 @@ class Normal(SimpleDistribution):
     @property
     def units(self):
         return self.loc.units
+
+
+    def __repr__(self):
+        if bellini.verbose:
+            return super(Normal, self).__repr__()
+        else:
+            if not isinstance(self.loc, Distribution):
+                u = f'{self.loc:~P.2f}'
+            else:
+                u = f'{self.loc}'
+            if not isinstance(self.scale, Distribution):
+                sig2 = f'{self.scale**2:~P.2f}'
+            else:
+                sig2 = f'{self.scale**2}'
+
+            return f'N({u}, {sig2})'
