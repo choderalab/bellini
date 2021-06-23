@@ -348,6 +348,9 @@ class Solution(Group):
             Solvent
         )
 
+        if 'concentration' not in values.keys():
+            values['concentration'] = substance.moles/solvent.volume
+        
         super(Solution, self).__init__(
             substance=substance,
             solvent=solvent,
@@ -361,12 +364,6 @@ class Solution(Group):
     @property
     def volume(self):
         return self.solvent.volume
-
-    @property
-    def concentration(self):
-        if getattr(self, "_concentration", None) != (self.substance.moles / self.solvent.volume):
-            self._concentration = (self.substance.moles / self.solvent.volume)
-        return self._concentration
 
     def __repr__(self):
         return f"{self.concentration} of {self.substance.species} in {self.solvent}"
@@ -396,7 +393,7 @@ class Solution(Group):
         )
 
     def aliquot(self, volume):
-        """ Removes an aliquot and returns it """
+        """ Split into aliquot and source """
         #assert volume.units == VOLUME_UNIT
 
         new_volume = self.volume - volume
@@ -410,7 +407,8 @@ class Solution(Group):
 
         aliquot = Solution(
             substance = aliquot_substance,
-            solvent = aliquot_solvent
+            solvent = aliquot_solvent,
+            concentration = self.concentration
         )
 
         source_substance = Substance(
@@ -420,7 +418,8 @@ class Solution(Group):
 
         source = Solution(
             substance = source_substance,
-            solvent = source_solvent
+            solvent = source_solvent,
+            concentration = self.concentration
         )
 
         return aliquot, source
