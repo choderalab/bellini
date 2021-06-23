@@ -350,7 +350,7 @@ class Solution(Group):
 
         if 'concentration' not in values.keys():
             values['concentration'] = substance.moles/solvent.volume
-        
+
         super(Solution, self).__init__(
             substance=substance,
             solvent=solvent,
@@ -425,10 +425,10 @@ class Solution(Group):
         return aliquot, source
 
 
-class Well(Group):
+class Container(Group):
     """ Simple container for a solution """
     def __init__(self, solution=None, **values):
-        super(Well, self).__init__(solution = solution, **values)
+        super(Container, self).__init__(solution = solution, **values)
 
     def retrieve_aliquot(self, volume):
         """ Removes an aliquot and returns it """
@@ -448,3 +448,13 @@ class Well(Group):
 
     def observe(self, value):
         return getattr(self.solution, value)
+
+class WellArray(Container):
+    """ An array of Containers (e.g. well plate). Must contain an array """
+    def __init__(self, solution=None, **values):
+        assert (isinstance(solution.volume.magnitude, np.ndarray) or
+                isinstance(solution.volume.magnitude, jnp.ndarray))
+        super(WellArray, self).__init__(solution=solution, **values)
+
+    def retrieve_well_aliquot(self, idx, volume):
+        raise NotImplementedError()
