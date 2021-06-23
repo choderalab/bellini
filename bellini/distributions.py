@@ -206,7 +206,13 @@ class ComposedDistribution(Distribution):
                 repr(self.distributions[1]),
             )
         else:
-            return f'CompDist w mag {self.magnitude:.2f} {self.units:~P}'
+            import numpy as np
+            import jax.numpy as jnp
+            if isinstance(self.magnitude, np.ndarray) or isinstance(self.magnitude, jnp.ndarray):
+                mag = repr(self.magnitude)
+            else:
+                mag = f"{self.magnitude:.2f}"
+            return f'CompDist w mag {mag} {self.units:~P}'
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """

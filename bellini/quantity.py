@@ -19,11 +19,11 @@ class Quantity(pint.quantity.Quantity):
     def _convert_to_numpy(x):
         if isinstance(x, float):
             return x
-        if isinstance(x, np.ndarray):
+        elif isinstance(x, np.ndarray):
             return x
-        if isinstance(x, jnp.ndarray):
+        elif isinstance(x, jnp.ndarray):
             return x
-        if isinstance(x, torch.Tensor):
+        elif isinstance(x, torch.Tensor):
             # TODO:
             # do not require torch import ahead of time
             return x.numpy()
@@ -72,3 +72,12 @@ class Quantity(pint.quantity.Quantity):
             return (x ** -1) * self
         else:
             return super(Quantity, self).__truediv__(x)
+
+    def __hash__(self):
+        self_base = self.to_base_units()
+        # TODO: faster way to hash an array?
+        # str(arr.sum()) + str((arr**2).sum()) is a possibility for large arrays
+        if isinstance(self.magnitude, np.ndarray) or isinstance(self.magnitude, jnp.ndarray):
+            return hash((self_base.__class__, self_base.magnitude.tostring(), self_base.units))
+        else:
+            return super(Quantity, self).__hash__()
