@@ -126,10 +126,12 @@ class Group(abc.ABC):
 
     def add_law(self, law):
         assert len(law) == 3
+        """
         _from, _to, _lamb = law
-        assert isinstance(_from, str)
-        assert isinstance(_to, str)
+        assert isinstance(_from, dict)
+        assert isinstance(_to, dict)
         assert isinstance(_lamb, str)
+        """
         self.laws.append(law)
 
 # =============================================================================
@@ -212,7 +214,12 @@ class Substance(Group):
         return hash(self.moles.magnitude) + hash(self.species)
 
 
-class Solvent(Group):
+class Liquid(Group):
+    @abc.abstractmethod
+    def aliquot(self, volume):
+        raise NotImplementedError()
+
+class Solvent(Liquid):
     """ A chemical substance with species and volume. """
     def __init__(self, species, volume, **values):
         # check the type of species
@@ -255,7 +262,7 @@ class Solvent(Group):
     def __mul__(self, x):
         assert isinstance(x, float) or isinstance(x, Distribution)
 
-        return Substance(
+        return Solvent(
             self.species,
             x * self.volume,
         )
@@ -283,7 +290,16 @@ class Solvent(Group):
 class Mixture(Group):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
-        super(Mixture, self).__init__(substances=tuple(set(substances)), **values)
+
+        sub_dict = {}
+        for sub in substances:
+            species = sub.species
+            if species not in sub_dict.keys():
+                sub_dict[species] = sub
+            else:
+                sub_dict[species] = sub_dict[species] + sub
+
+        super(Mixture, self).__init__(substances=tuple(sub_dict.values()), **values)
 
     def __repr__(self):
         return ' and '.join([str(x) for x in self.substances])
@@ -336,7 +352,7 @@ class Mixture(Group):
         return list(set(self.substances)) == list(set(self.substances))
 
 
-class Solution(Group):
+class Solution(Liquid):
     def __init__(self, substance, solvent, **values):
         # check the type of substance and solvent
         assert isinstance(
@@ -390,6 +406,7 @@ class Solution(Group):
         return Solution(
             substance = x * self.substance,
             solvent = x * self.solvent,
+            concentration = self.concentration
         )
 
     def aliquot(self, volume):
@@ -424,11 +441,126 @@ class Solution(Group):
 
         return aliquot, source
 
+class ComplexSolution(Liquid):
+    def __init__(self, mixture, solvent, **values):
+        # check the type of substance and solvent
+        assert isinstance(
+            mixture,
+            Mixture,
+        )
+        assert isinstance(
+            solvent,
+            Solvent
+        )
+
+        if 'concentrations' not in values.keys():
+            values['concentrations'] = {
+                substance.species: substance.moles/solvent.volume
+                for substance in mixture.substances
+            }
+
+        super(ComplexSolution, self).__init__(
+            mixture=mixture,
+            solvent=solvent,
+            **values
+        )
+
+    @property
+    def moles(self):
+        return [substance.moles for substance in self.mixture.substances]
+
+    @property
+    def volume(self):
+        return self.solvent.volume
+
+    def __repr__(self):
+        return " and ".join([
+        f"{self.concentrations[substance.species]} of {substance.species}"
+        for substance in self.mixture.substances
+        ]) + f" in {self.solvent}"
+
+    def __add__(self, x):
+        if isinstance(x, Solvent):
+            assert self.solvent.species == x.species, "currently don't suppose mixed solvent solutions"
+            return ComplexSolution(
+                mixture = self.mixture,
+                solvent = self.solvent + x
+            )
+        elif isinstance(x, Solution):
+            assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
+            return ComplexSolution(
+                mixture = self.mixture + x.substances,
+                solvent = self.solvent + x.solvent
+            )
+        elif isinstance(x, ComplexSolution):
+            assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
+            return ComplexSolution(
+                mixture = self.mixture + x.mixture,
+                solvent = self.solvent + x.solvent
+            )
+        else:
+            raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
+
+    def __mul__(self, x):
+        assert isinstance(x, float)
+
+        return ComplexSolution(
+            mixture = x * self.mixture,
+            solvent = x * self.solvent
+        )
+
+    # TODO: change to work
+    def aliquot(self, volume):
+        """ Split into aliquot and source """
+        #assert volume.units == VOLUME_UNIT
+
+        new_volume = self.volume - volume
+
+        aliquot_mixture = Mixture(
+            substances = [
+                Substance(
+                    species = substance.species,
+                    moles = self.concentrations[substance.species] * volume
+                ) for substance in self.mixture.substances
+            ]
+        )
+
+        aliquot_solvent, source_solvent = self.solvent.aliquot(volume)
+
+        aliquot = ComplexSolution(
+            mixture = aliquot_mixture,
+            solvent = aliquot_solvent,
+            concentrations = self.concentrations
+        )
+
+        source_mixture = Mixture(
+            substances = [
+                Substance(
+                    species = substance.species,
+                    moles = self.concentrations[substance.species] * new_volume
+                ) for substance in self.mixture.substances
+            ]
+        )
+
+        source = ComplexSolution(
+            mixture = source_mixture,
+            solvent = source_solvent,
+            concentrations = self.concentrations
+        )
+
+        return aliquot, source
 
 class Container(Group):
     """ Simple container for a solution """
     def __init__(self, solution=None, **values):
         super(Container, self).__init__(solution = solution, **values)
+
+    @property
+    def volume(self):
+        if self.solution is not None:
+            return self.solution.volume
+        else:
+            return Quantity(0.0, VOLUME_UNIT)
 
     def retrieve_aliquot(self, volume):
         """ Removes an aliquot and returns it """
@@ -446,8 +578,11 @@ class Container(Group):
     def __repr__(self):
         return f"Well containing {self.solution}"
 
-    def observe(self, value):
-        return getattr(self.solution, value)
+    def observe(self, value, key=None):
+        if key:
+            return getattr(self.solution, value)[key]
+        else:
+            return getattr(self.solution, value)
 
 class WellArray(Container):
     """ An array of Containers (e.g. well plate). Must contain an array """
