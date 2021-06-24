@@ -306,3 +306,37 @@ class Normal(SimpleDistribution):
                 sig2 = f'{self.scale**2}'
 
             return f'N({u}, {sig2})'
+
+class Uniform(SimpleDistribution):
+    """ Uniform distribution. """
+    def __init__(self, low, high, **kwargs):
+        assert low.dimensionality == high.dimensionality
+        super(Uniform, self).__init__(low=low, high=high, **kwargs)
+
+    @property
+    def dimensionality(self):
+        return self.low.dimensionality
+
+    @property
+    def magnitude(self):
+        return self.high.magnitude - self.low.magnitude
+
+    @property
+    def units(self):
+        return self.low.units
+
+
+    def __repr__(self):
+        if bellini.verbose:
+            return super(Uniform, self).__repr__()
+        else:
+            if not isinstance(self.low, Distribution):
+                low = f'{self.low:~P.2f}'
+            else:
+                low = f'{self.low}'
+            if not isinstance(self.high, Distribution):
+                high = f'{self.high**2:~P.2f}'
+            else:
+                high = f'{self.high**2}'
+
+            return f'U({low}, {high})'
