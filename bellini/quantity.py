@@ -78,7 +78,7 @@ class Quantity(pint.quantity.Quantity):
         # TODO: faster way to hash an array?
         # str(arr.sum()) + str((arr**2).sum()) is a possibility for large arrays
         if isinstance(self.magnitude, np.ndarray) or isinstance(self.magnitude, jnp.ndarray):
-            return hash((self_base.__class__, self_base.magnitude.tostring(), self_base.units))
+            return hash((self_base.__class__, self_base.magnitude.tobytes(), self_base.units))
         else:
             return super(Quantity, self).__hash__()
 
