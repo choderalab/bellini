@@ -5,6 +5,7 @@
 import abc
 import pint
 import numpy as np
+import jax.numpy as jnp
 import bellini
 from bellini.distributions import Distribution, Normal
 from bellini.quantity import Quantity
@@ -41,6 +42,13 @@ class Dispenser(Actionable):
         self.dispense_count = 0
 
     def apply(self, parent_node, child_node, volume, parent_final_name=None, child_final_name=None):
+
+        if isinstance(parent_node.volume.magnitude, np.ndarray):
+            volume = volume * np.ones_like(parent_node.volume.magnitude)
+        elif isinstance(parent_node.volume.magnitude, jnp.ndarray):
+            volume = volume * jnp.ones_like(parent_node.volume.magnitude)
+
+
         drawn_volume = Normal(volume, self.var)
         drawn_volume.name = f"vol_transfer_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
@@ -65,8 +73,8 @@ class Measurer(Actionable):
         self.name = name
         self.measure_count = 0
 
-    def apply(self, parent_node, value):
-        measurement = Normal(parent_node.observe(value), self.var)
+    def apply(self, parent_node, value, key=None):
+        measurement = Normal(parent_node.observe(value, key=key), self.var)
         measurement.name = f"measurement_{parent_node}_{value}_{self.measure_count}"
         self.measure_count += 1
         measurement.observed = True
