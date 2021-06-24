@@ -53,7 +53,7 @@ class Dispenser(Actionable):
         drawn_volume.name = f"vol_transfer_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
         aliquot = parent_node.retrieve_aliquot(drawn_volume)
-        child_node.recieve_aliquot(aliquot)
+        child_node.receive_aliquot(aliquot)
 
 
 
