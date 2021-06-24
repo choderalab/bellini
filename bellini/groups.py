@@ -18,9 +18,10 @@ from bellini.units import *
 class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
 
-    def __init__(self, name=None, laws=None, **values):
+    def __init__(self, name=None, laws=[], **values):
         self.values = values
         self.laws = laws
+        self.io_maps = []
         self._name = name
 
     @property
@@ -50,11 +51,17 @@ class Group(abc.ABC):
             )
         """
         for name, value in self.values.items():
-            if isinstance(value, list):
+            if isinstance(value, list) or isinstance(value, tuple):
                 for v in value:
                     g.add_node(
                         v,
                         name=name
+                    )
+            elif isinstance(value, dict):
+                for k, v in value.items():
+                    g.add_node(
+                        v,
+                        name=f"{name}[{k}]"
                     )
             else:
                 g.add_node(
@@ -79,12 +86,13 @@ class Group(abc.ABC):
         # equilibirium conc, multiple conc. -> multiple conc. # with
         # observation model
 
-        if self.laws is not None:
-            for _from, _to, _lamb in self.laws:
+
+        for io_map in self.io_maps:
+            for _from, _to in io_map:
                 g.add_edge(
                     getattr(self, _from),
                     getattr(self, _to),
-                    law=_lamb,
+                    law="i need to fill this out",
                 )
 
         self._g = g
@@ -120,12 +128,13 @@ class Group(abc.ABC):
     def apply_laws(self):
         if self.laws is not None:
             for law in self.laws:
-                new_values = law(self)
-                for name, value in new_values:
+                new_values, io_map = law.apply(self)
+                self.io_maps.append(io_map)
+                for name, value in new_values.items():
                     setattr(self, name, value)
 
     def add_law(self, law):
-        assert len(law) == 3
+        assert isinstance(law, bellini.laws.Law)
         """
         _from, _to, _lamb = law
         assert isinstance(_from, dict)
@@ -351,6 +360,13 @@ class Mixture(Group):
     def __eq__(self, x):
         return list(set(self.substances)) == list(set(self.substances))
 
+    def __hash__(self):
+        return sum([
+            hash(sub.moles)
+            + hash(sub.species)
+            for sub in self.substances
+        ])
+
 
 class Solution(Liquid):
     def __init__(self, substance, solvent, **values):
@@ -393,10 +409,16 @@ class Solution(Liquid):
             )
         elif isinstance(x, Solution):
             assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
-            return Solution(
-                substance = self.substance + x.substance,
-                solvent = self.solvent + x.solvent
-            )
+            if self.substance.species == x.substance.species:
+                return Solution(
+                    substance = self.substance + x.substance,
+                    solvent = self.solvent + x.solvent
+                )
+            else:
+                return ComplexSolution(
+                    mixture = self.substance + x.substance,
+                    solvent = self.solvent + x.solvent
+                )
         else:
             raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
 
@@ -569,7 +591,7 @@ class Container(Group):
         self.solution = source
         return aliquot
 
-    def recieve_aliquot(self, solution):
+    def receive_aliquot(self, solution):
         if self.solution is not None:
             self.solution = self.solution + solution
         else:
