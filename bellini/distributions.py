@@ -324,7 +324,10 @@ class Normal(SimpleDistribution):
 
             return f'N({u}, {sig2})'
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 016948e1d9e540da695123322790ab3fb9f8b9a4
 class Uniform(SimpleDistribution):
     """ Uniform distribution. """
     def __init__(self, low, high, **kwargs):
@@ -337,7 +340,11 @@ class Uniform(SimpleDistribution):
 
     @property
     def magnitude(self):
+<<<<<<< HEAD
         return (self.high.magnitude - self.low.magnitude)/2
+=======
+        return self.high.magnitude - self.low.magnitude
+>>>>>>> 016948e1d9e540da695123322790ab3fb9f8b9a4
 
     @property
     def units(self):
