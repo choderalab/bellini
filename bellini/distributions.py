@@ -103,8 +103,14 @@ class Distribution(abc.ABC):
     def __add__(self, x):
         return ComposedDistribution([self, x], op="add")
 
+    def __radd__(self, x):
+        return self.__add__(x)
+
     def __sub__(self, x):
         return ComposedDistribution([self, x], op="sub")
+
+    def __rsub__(self, x):
+        return ComposedDistribution([x, self], op="sub")
 
     def __neg__(self):
         return TransformedDistribution(self, op='neg')
@@ -112,11 +118,20 @@ class Distribution(abc.ABC):
     def __mul__(self, x):
         return ComposedDistribution([self, x], op="mul")
 
+    def __rmul__(self, x):
+        return self.__mul__(x)
+
     def __truediv__(self, x):
         return ComposedDistribution([self, x], op="div")
 
+    def __rtruediv__(self, x):
+        return ComposedDistribution([x, self], op="div")
+
     def __pow__(self, x):
         return TransformedDistribution(self, op="pow", order=x)
+
+    def __rpow__(self, x):
+        return TransformedDistribution(x, op="pow", order=self)
 
     def __abs__(self):
         return TransformedDistribution(self, op="abs")
@@ -139,6 +154,7 @@ class Distribution(abc.ABC):
 class SimpleDistribution(Distribution):
     def __init__(self, *args, **kwargs):
         super(SimpleDistribution, self).__init__(**kwargs)
+
 
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
@@ -214,6 +230,7 @@ class ComposedDistribution(Distribution):
                 mag = f"{self.magnitude:.2f}"
             return f'CompDist w mag {mag} {self.units:~P}'
 
+
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
     def __init__(self, distribution, op, **kwargs):
@@ -270,6 +287,7 @@ class TransformedDistribution(Distribution):
         else:
             raise NotImplementedError("computing units for given operation not supported")
 
+
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
@@ -291,7 +309,6 @@ class Normal(SimpleDistribution):
     def units(self):
         return self.loc.units
 
-
     def __repr__(self):
         if bellini.verbose:
             return super(Normal, self).__repr__()
@@ -306,3 +323,38 @@ class Normal(SimpleDistribution):
                 sig2 = f'{self.scale**2}'
 
             return f'N({u}, {sig2})'
+
+
+class Uniform(SimpleDistribution):
+    """ Uniform distribution. """
+    def __init__(self, low, high, **kwargs):
+        assert low.dimensionality == high.dimensionality
+        super(Uniform, self).__init__(low=low, high=high, **kwargs)
+
+    @property
+    def dimensionality(self):
+        return self.low.dimensionality
+
+    @property
+    def magnitude(self):
+        return (self.high.magnitude - self.low.magnitude)/2
+
+    @property
+    def units(self):
+        return self.low.units
+
+
+    def __repr__(self):
+        if bellini.verbose:
+            return super(Uniform, self).__repr__()
+        else:
+            if not isinstance(self.low, Distribution):
+                low = f'{self.low:~P.2f}'
+            else:
+                low = f'{self.low}'
+            if not isinstance(self.high, Distribution):
+                high = f'{self.high**2:~P.2f}'
+            else:
+                high = f'{self.high**2}'
+
+            return f'U({low}, {high})'
