@@ -4,7 +4,7 @@ Bayesian Learning on Laboratory Investigations
 """
 
 # Add imports here
-from ._globals import verbose
+from ._globals import *
 from .quantity import *
 from .groups import *
 from .distributions import *
