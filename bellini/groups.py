@@ -41,33 +41,33 @@ class Group(abc.ABC):
 
         g = nx.MultiDiGraph() # initialize empty graph
 
-        """
-        # loop through values
-        for name, value in self.values.items():
-
-            g.add_node(
-                value,
-                name=name,
-            )
-        """
+        # to compose or to not to compose?
         for name, value in self.values.items():
             if isinstance(value, list) or isinstance(value, tuple):
                 for v in value:
+                    #print(v)
                     g.add_node(
                         v,
                         name=name
                     )
+                    g = nx.compose(g, v.g)
             elif isinstance(value, dict):
                 for k, v in value.items():
+                    #print(v)
                     g.add_node(
                         v,
                         name=f"{name}[{k}]"
                     )
+                    g = nx.compose(g, v.g)
             else:
+                #print(value)
                 g.add_node(
                     value,
                     name=name
                 )
+                g = nx.compose(g, value.g)
+
+
 
 
         # NOTE:
@@ -126,6 +126,7 @@ class Group(abc.ABC):
             }
 
     def apply_laws(self):
+        self.io_maps = []
         if self.laws is not None:
             for law in self.laws:
                 new_values, io_map = law.apply(self)
@@ -144,7 +145,7 @@ class Group(abc.ABC):
         self.laws.append(law)
 
 # =============================================================================
-# SUBCLASSES
+# Chemicals
 # =============================================================================
 
 class Species(Group):
@@ -220,7 +221,7 @@ class Substance(Group):
         )
 
     def __hash__(self):
-        return hash(self.moles.magnitude) + hash(self.species)
+        return hash(self.moles) + hash(self.species)
 
 
 class Liquid(Group):
@@ -277,7 +278,7 @@ class Solvent(Liquid):
         )
 
     def __hash__(self):
-        return hash(self.volume.magnitude) + hash(self.species)
+        return hash(self.volume) + hash(self.species)
 
     def aliquot(self, volume):
         """ Split into aliquot and source """
@@ -572,9 +573,15 @@ class ComplexSolution(Liquid):
 
         return aliquot, source
 
+# =============================================================================
+# Containers
+# =============================================================================
+
 class Container(Group):
     """ Simple container for a solution """
     def __init__(self, solution=None, **values):
+        if solution is not None:
+            assert isinstance(solution, Liquid)
         super(Container, self).__init__(solution = solution, **values)
 
     @property
@@ -606,12 +613,18 @@ class Container(Group):
         else:
             return getattr(self.solution, value)
 
+
 class WellArray(Container):
     """ An array of Containers (e.g. well plate). Must contain an array """
     def __init__(self, solution=None, **values):
         assert (isinstance(solution.volume.magnitude, np.ndarray) or
                 isinstance(solution.volume.magnitude, jnp.ndarray))
+        assert len(solution.volume.magnitude.shape) == 2 # force plate to be 2d
         super(WellArray, self).__init__(solution=solution, **values)
 
-    def retrieve_well_aliquot(self, idx, volume):
+    def retrieve_well_aliquot(self, row, column, volume):
+        assert self.solution is not None
+        raise NotImplementedError()
+
+    def receive_well_aliquot(self, idx, volume):
         raise NotImplementedError()
