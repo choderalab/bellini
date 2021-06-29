@@ -21,6 +21,28 @@ class Law(abc.ABC):
         """
         raise NotImplementedError()
 
+def log(x):
+    if isinstance(x, bellini.distributions.Distribution):
+        return x.log()
+    elif isinstance(x, bellini.quantity.Quantity):
+        return Quantity(jnp.log(x.magnitude), ureg.dimensionless)
+    else:
+        return Quantity(jnp.log(x), ureg.dimensionless)
+
+def exp(x):
+    if isinstance(x, bellini.distributions.Distribution):
+        return x.exp()
+    elif isinstance(x, bellini.quantity.Quantity):
+        return Quantity(jnp.exp(x.magnitude), ureg.dimensionless)
+    else:
+        return Quantity(jnp.exp(x), ureg.dimensionless)
+
+def sqrt(x):
+    if isinstance(x, bellini.distributions.Distribution):
+        return x ** 0.5
+    else:
+        return jnp.sqrt(x)
+
 class TwoComponentBindingModel(Law):
     def __init__(self, input_mapping):
         assert "ligand" in input_mapping.keys()
@@ -54,10 +76,14 @@ class TwoComponentBindingModel(Law):
         solution.protein = Ptot
         solution.dG = dG
 
-        Ltot, L_units = Ltot.magnitude, Ltot.units
-        Ptot, P_units = Ptot.magnitude, Ptot.units
-        dG, dG_units = dG.magnitude, dG.units
+        MOLAR = ureg.mole / ureg.liter
+        Ltot = Ltot.to(MOLAR)
+        Ptot = Ptot.to(MOLAR)
+        #Ltot, L_units = Ltot.to(MOLAR).magnitude, Ltot.units
+        #Ptot, P_units = Ptot.to(MOLAR).magnitude, Ptot.units
+        #dG, dG_units = dG.magnitude, dG.units
 
+        """
         # Handle only strictly positive elements---all others are set to zero as constants
         try:
             nonzero_indices = jnp.where(Ltot > 0)[0]
@@ -82,6 +108,22 @@ class TwoComponentBindingModel(Law):
         PL = PL.at[nonzero_indices].set(
             0.5 * PLK * (1.0 - jnp.sqrt(sqrt_arg))
         )  # complex concentration (M)
+        """
+        dtype = jnp.float32
+        Ptot = Ptot.astype(dtype)  # promote to dtype
+        Ltot = Ltot.astype(dtype)  # promote to dtype
+        PL = jnp.zeros(Ptot.shape, dtype)
+        logP = log(Ptot)
+        logL = log(Ltot)
+        print(logP, logL)
+        logPLK = log(exp(logP) + exp(logL) + exp(dG))
+        print(logPLK)
+        PLK = exp(logPLK)
+        print(PLK)
+        sqrt_arg = 1.0 - exp(log(4.0) + logP + logL - 2.0 * logPLK)
+        print(sqrt_arg)
+        PL = 0.5 * PLK * (1.0 - sqrt(sqrt_arg)) # complex concentration (M)
+        print(PL)
 
         # Compute remaining concentrations.
         P = Ptot - PL
@@ -89,14 +131,17 @@ class TwoComponentBindingModel(Law):
         L = Ltot - PL
         # free ligand concentration in sample cell after n injections (M)
 
+        """
         # Ensure all concentrations are within limits, correcting cases where numerical issues cause problems.
         PL = jnp.where(PL >= 0.0, PL, 0.0)  # complex cannot have negative concentration
         P = jnp.where(P >= 0.0, P, 0.0)
         L = jnp.where(L >= 0.0, L, 0.0)
+        """
 
-        PL = Quantity(PL, P_units)
-        P = Quantity(P, P_units)
-        L = Quantity(L, L_units)
+        print(PL.units)
+        PL = Quantity(PL, MOLAR).to(P_units)
+        P = Quantity(P, MOLAR).to(P_units)
+        L = Quantity(L, MOLAR).to(L_units)
 
         # generate input-output edges
         io_map = []
