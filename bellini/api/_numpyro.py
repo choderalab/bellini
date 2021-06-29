@@ -50,7 +50,7 @@ def graph_to_numpyro_model(g):
 
                     parameters = {}
                     for param_name, param in node.parameters.items():
-                        eval(param)
+                        eval_node(param)
                         parameters[param_name] = model_dict[param].magnitude
 
                     sample = numpyro.sample(
@@ -76,7 +76,7 @@ def graph_to_numpyro_model(g):
                     op = bellini.distributions.OPS[node.op]
                     distributions = node.distributions
                     for param in distributions:
-                        eval(param)
+                        eval_node(param)
 
                     assert len(distributions) == 2
                     sample = op(
@@ -95,7 +95,7 @@ def graph_to_numpyro_model(g):
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
                     name = node.name
                     op = bellini.distributions.OPS[node.op]
-                    eval(node.distribution)
+                    eval_node(node.distribution)
 
                     if op == 'pow':
                         sample = op(
