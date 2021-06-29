@@ -23,8 +23,7 @@ def graph_to_numpyro_model(g):
     param graph? need to think about design
     """
     import networkx as nx
-    observed_nodes = [node for node in g.nodes if hasattr(node, "observed")]
-    observed_nodes = [node for node in observed_nodes if node.observed is True]
+    observed_nodes = [node for node in g.nodes if getattr(node, "observed", None)]
 
     if len(observed_nodes) != 1:
         raise NotImplementedError("Now we only support one observation of one node.")
@@ -33,7 +32,7 @@ def graph_to_numpyro_model(g):
     def model(obs = None):
         model_dict = {}
 
-        def eval(node):
+        def eval_node(node):
             """ Evaluate node values recursively using DP """
             if node in model_dict.keys():
                 return
@@ -116,7 +115,7 @@ def graph_to_numpyro_model(g):
                         node.units,
                     )
 
-        eval(observed_node)
+        eval_node(observed_node)
 
         return model_dict[observed_node].magnitude, model_dict
 
