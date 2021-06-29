@@ -83,6 +83,8 @@ class Quantity(pint.quantity.Quantity):
             return super(Quantity, self).__hash__()
 
     def __eq__(self, other):
-        iseq = super(Quantity, self).__eq__(other)
-        if isinstance(iseq, np.ndarray) or isinstance(iseq, jnp.ndarray):
-            return iseq.all()
+        is_eq = super(Quantity, self).__eq__(other)
+        if isinstance(is_eq, np.ndarray) or isinstance(is_eq, jnp.ndarray):
+            return is_eq.all()
+        else:
+            return is_eq
