@@ -3,6 +3,7 @@
 # =============================================================================
 import abc
 import bellini
+from bellini.units import *
 
 # =============================================================================
 # CONSTANTS
@@ -217,7 +218,7 @@ class ComposedDistribution(Distribution):
     def __repr__(self):
         if bellini.verbose:
             return 'ComposedDistriubution: (%s %s %s)' % (
-                repr(self.distributions[0].name),
+                repr(self.distributions[0]),
                 self.op,
                 repr(self.distributions[1]),
             )
@@ -237,6 +238,7 @@ class TransformedDistribution(Distribution):
         super(TransformedDistribution, self).__init__()
         self.distribution = distribution
         self.op = op
+        self.kwargs = kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -284,6 +286,8 @@ class TransformedDistribution(Distribution):
             return self.distribution.units
         elif self.op == "pow":
             return self.distribution.units ** self.order
+        elif self.op == "log" or self.op == "exp":
+            return ureg.dimensionless
         else:
             raise NotImplementedError("computing units for given operation not supported")
 
