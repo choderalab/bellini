@@ -347,7 +347,6 @@ class Uniform(SimpleDistribution):
     def units(self):
         return self.low.units
 
-
     def __repr__(self):
         if bellini.verbose:
             return super(Uniform, self).__repr__()
@@ -357,8 +356,8 @@ class Uniform(SimpleDistribution):
             else:
                 low = f'{self.low}'
             if not isinstance(self.high, Distribution):
-                high = f'{self.high**2:~P.2f}'
+                high = f'{self.high:~P.2f}'
             else:
-                high = f'{self.high**2}'
+                high = f'{self.high}'
 
             return f'U({low}, {high})'
