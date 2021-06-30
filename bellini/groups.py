@@ -368,105 +368,12 @@ class Mixture(Group):
             for sub in self.substances
         ])
 
-
 class Solution(Liquid):
-    def __init__(self, substance, solvent, **values):
-        # check the type of substance and solvent
-        assert isinstance(
-            substance,
-            Substance,
-        )
-        assert isinstance(
-            solvent,
-            Solvent
-        )
-
-        if 'concentration' not in values.keys():
-            values['concentration'] = substance.moles/solvent.volume
-
-        super(Solution, self).__init__(
-            substance=substance,
-            solvent=solvent,
-            **values
-        )
-
-    @property
-    def moles(self):
-        return self.substance.moles
-
-    @property
-    def volume(self):
-        return self.solvent.volume
-
-    def __repr__(self):
-        return f"{self.concentration} of {self.substance.species} in {self.solvent}"
-
-    def __add__(self, x):
-        if isinstance(x, Solvent):
-            assert self.solvent.species == x.species, "currently don't suppose mixed solvent solutions"
-            return Solution(
-                substance = self.substance,
-                solvent = self.solvent + x
-            )
-        elif isinstance(x, Solution):
-            assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
-            if self.substance.species == x.substance.species:
-                return Solution(
-                    substance = self.substance + x.substance,
-                    solvent = self.solvent + x.solvent
-                )
-            else:
-                return ComplexSolution(
-                    mixture = self.substance + x.substance,
-                    solvent = self.solvent + x.solvent
-                )
-        else:
-            raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
-
-    def __mul__(self, x):
-        assert isinstance(x, float)
-
-        return Solution(
-            substance = x * self.substance,
-            solvent = x * self.solvent,
-            concentration = self.concentration
-        )
-
-    def aliquot(self, volume):
-        """ Split into aliquot and source """
-        #assert volume.units == VOLUME_UNIT
-
-        new_volume = self.volume - volume
-
-        aliquot_substance = Substance(
-            species=self.substance.species,
-            moles=self.concentration * volume
-        )
-
-        aliquot_solvent, source_solvent = self.solvent.aliquot(volume)
-
-        aliquot = Solution(
-            substance = aliquot_substance,
-            solvent = aliquot_solvent,
-            concentration = self.concentration
-        )
-
-        source_substance = Substance(
-            species=self.substance.species,
-            moles=self.concentration * new_volume
-        )
-
-        source = Solution(
-            substance = source_substance,
-            solvent = source_solvent,
-            concentration = self.concentration
-        )
-
-        return aliquot, source
-
-class ComplexSolution(Liquid):
     def __init__(self, mixture, solvent, **values):
         # check the type of substance and solvent
+        if isinstance(mixture, Substance):
+            mixture = Mixture([mixture])
+
         assert isinstance(
             mixture,
             Mixture,
@@ -482,7 +389,7 @@ class ComplexSolution(Liquid):
                 for substance in mixture.substances
             }
 
-        super(ComplexSolution, self).__init__(
+        super(Solution, self).__init__(
             mixture=mixture,
             solvent=solvent,
             **values
@@ -496,6 +403,11 @@ class ComplexSolution(Liquid):
     def volume(self):
         return self.solvent.volume
 
+    @property
+    def concentration(self):
+        assert len(self.concentrations) == 1, f"{self} complex solution, use `self.concentrations` instead"
+        return list(self.concentrations.values())[0]
+
     def __repr__(self):
         return " and ".join([
         f"{self.concentrations[substance.species]} of {substance.species}"
@@ -505,19 +417,13 @@ class ComplexSolution(Liquid):
     def __add__(self, x):
         if isinstance(x, Solvent):
             assert self.solvent.species == x.species, "currently don't suppose mixed solvent solutions"
-            return ComplexSolution(
+            return Solution(
                 mixture = self.mixture,
                 solvent = self.solvent + x
             )
         elif isinstance(x, Solution):
             assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
-            return ComplexSolution(
-                mixture = self.mixture + x.substances,
-                solvent = self.solvent + x.solvent
-            )
-        elif isinstance(x, ComplexSolution):
-            assert self.solvent.species == x.solvent.species, "currently don't suppose mixed solvent solutions"
-            return ComplexSolution(
+            return Solution(
                 mixture = self.mixture + x.mixture,
                 solvent = self.solvent + x.solvent
             )
@@ -527,12 +433,11 @@ class ComplexSolution(Liquid):
     def __mul__(self, x):
         assert isinstance(x, float)
 
-        return ComplexSolution(
+        return Solution(
             mixture = x * self.mixture,
             solvent = x * self.solvent
         )
 
-    # TODO: change to work
     def aliquot(self, volume):
         """ Split into aliquot and source """
         #assert volume.units == VOLUME_UNIT
@@ -550,7 +455,7 @@ class ComplexSolution(Liquid):
 
         aliquot_solvent, source_solvent = self.solvent.aliquot(volume)
 
-        aliquot = ComplexSolution(
+        aliquot = Solution(
             mixture = aliquot_mixture,
             solvent = aliquot_solvent,
             concentrations = self.concentrations
@@ -565,7 +470,7 @@ class ComplexSolution(Liquid):
             ]
         )
 
-        source = ComplexSolution(
+        source = Solution(
             mixture = source_mixture,
             solvent = source_solvent,
             concentrations = self.concentrations
