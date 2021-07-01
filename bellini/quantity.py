@@ -8,6 +8,7 @@ import torch
 import bellini
 import bellini.distributions as dist
 from bellini.units import *
+
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
@@ -18,8 +19,8 @@ class Quantity(pint.quantity.Quantity):
 
     @staticmethod
     def _convert_to_numpy(x):
-        if isinstance(x, float):
-            return x
+        if isinstance(x, float) or isinstance(x, int):
+            return np.array(x)
         elif isinstance(x, np.generic):
             return x
         elif isinstance(x, np.ndarray):
@@ -35,8 +36,8 @@ class Quantity(pint.quantity.Quantity):
 
     @staticmethod
     def _convert_to_jnp(x):
-        if isinstance(x, float):
-            return x
+        if isinstance(x, float) or isinstance(x, int):
+            return jnp.array(x)
         elif isinstance(x, np.ndarray) or isinstance(x, np.generic):
             return jnp.array(x)
         elif isinstance(x, jnp.ndarray):
@@ -47,7 +48,7 @@ class Quantity(pint.quantity.Quantity):
             return jnp.array(x)
         raise ValueError("input could not be converted to jnp!")
 
-    def __new__(self, value, unit, name=None, infer=False):
+    def __new__(self, value, unit=None, name=None, infer=False):
         if infer:
             value = self._convert_to_jnp(value)
         else:
@@ -79,36 +80,34 @@ class Quantity(pint.quantity.Quantity):
         return self._g
 
     def __add__(self, x):
-        if isinstance(x, dist.Distribution):
-            return x + self
-        elif isinstance(x, bellini.groups.Group):
-            raise NotImplementedError()
+        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+            return NotImplemented
         else:
             return super(Quantity, self).__add__(x)
 
     def __sub__(self, x):
-        if isinstance(x, dist.Distribution):
-            return -x + self
-        elif isinstance(x, bellini.groups.Group):
-            raise NotImplementedError()
+        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+            return NotImplemented
         else:
             return super(Quantity, self).__sub__(x)
 
     def __mul__(self, x):
-        if isinstance(x, dist.Distribution):
-            return x * self
-        elif isinstance(x, bellini.groups.Group):
-            raise NotImplementedError()
+        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+            return NotImplemented
         else:
             return super(Quantity, self).__mul__(x)
 
     def __truediv__(self, x):
-        if isinstance(x, dist.Distribution):
-            return (x ** -1) * self
-        elif isinstance(x, bellini.groups.Group):
-            raise NotImplementedError()
+        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+            return NotImplemented
         else:
             return super(Quantity, self).__truediv__(x)
+
+    def __pow__(self, x):
+        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+            return NotImplemented
+        else:
+            return super(Quantity, self).__pow__(x)
 
     def __hash__(self):
         self_base = self.to_base_units()

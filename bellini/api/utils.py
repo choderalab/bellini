@@ -17,3 +17,10 @@ def mask(arr, idxs, invert=False):
         select = np.ones_like(arr)
         select[idxs] = 1
     return bellini.Quantity(select, ureg.dimensionless)
+
+def check_shape(a, b):
+    if not hasattr(a, "shape") or not hasattr(b, "shape"):
+        return True
+    if a.shape != () and b.shape != ():
+        return a.shape == b.shape
+    return True

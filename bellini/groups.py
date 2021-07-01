@@ -149,22 +149,43 @@ class Group(abc.ABC):
 # Chemicals
 # =============================================================================
 
-class Species(Group):
+class Chemical(Group):
+    @abc.abstractmethod
+    def __add__(self, x):
+        raise NotImplementedError
+
+    def __radd__(self, x):
+        return self.__add__(x)
+
+    @abc.abstractmethod
+    def __mul__(self, x):
+        raise NotImplementedError
+
+    def __rmul__(self, x):
+        return self.__mul__(x)
+
+class Species(Chemical):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
         super(Species, self).__init__(name=name, **values)
 
-    def __mul__(self, moles):
+    def __add__(self, x):
+        return NotImplemented
+
+    def __mul__(self, quantity):
         """ Species times quantity equals substance. """
         # check quantity is in mole
-        assert isinstance(moles, Quantity) or isinstance(moles, Distribution)
-
-        assert moles.units.dimensionality == ureg.mole.dimensionality
-
-        return Substance(
-            species=self,
-            moles=moles,
-        )
+        assert isinstance(quantity, Quantity) or isinstance(quantity, Distribution)
+        if quantity.units.dimensionality == ureg.mole.dimensionality:
+            return Substance(
+                species=self,
+                moles=quantity,
+            )
+        elif quantity.units.dimensionality == VOLUME_UNIT.dimensionality:
+            return Solvent(
+                species=self,
+                volume=quantity
+            )
 
     def __repr__(self):
         return self.name
@@ -173,7 +194,7 @@ class Species(Group):
         return hash(self.name)
 
 
-class Substance(Group):
+class Substance(Chemical):
     """ A chemical substance with species and number of moles. """
     def __init__(self, species, moles, **values):
         # check the type of species
@@ -214,7 +235,8 @@ class Substance(Group):
             raise ValueError("Can only add Mixture or Substance to Substance")
 
     def __mul__(self, x):
-        assert isinstance(x, float) or isinstance(x, Distribution)
+        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert x.units.dimensionality == ureg.dimensionless.dimensionality
 
         return Substance(
             self.species,
@@ -232,7 +254,7 @@ class Substance(Group):
         )
 
 
-class Liquid(Group):
+class Liquid(Chemical):
     @abc.abstractmethod
     def aliquot(self, volume):
         raise NotImplementedError()
@@ -278,7 +300,8 @@ class Solvent(Liquid):
             raise ValueError("Can only add Solvent or Mixture to Ssolvent")
 
     def __mul__(self, x):
-        assert isinstance(x, float) or isinstance(x, Distribution)
+        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert x.units.dimensionality == ureg.dimensionless.dimensionality
 
         return Solvent(
             self.species,
@@ -312,7 +335,7 @@ class Solvent(Liquid):
         )
 
 
-class Mixture(Group):
+class Mixture(Chemical):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
 
@@ -338,7 +361,8 @@ class Mixture(Group):
         return ' and '.join([str(x) for x in self.substances])
 
     def __mul__(self, x):
-        assert isinstance(x, float)
+        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert x.units.dimensionality == ureg.dimensionless.dimensionality
 
         return Mixture(
             [
@@ -463,12 +487,16 @@ class Solution(Liquid):
             raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
 
     def __mul__(self, x):
-        assert isinstance(x, float)
+        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert x.units.dimensionality == ureg.dimensionless.dimensionality
 
         return Solution(
             mixture = x * self.mixture,
             solvent = x * self.solvent
         )
+
+    def __rmul__(self, x):
+        return self.__mul__(x)
 
     def __getitem__(self, idxs):
         return Solution(
@@ -564,8 +592,10 @@ class WellArray(Container):
         super(WellArray, self).__init__(solution=solution, **values)
 
     def subset_aliquot(self, idxs, volume):
-        clear = utils.mask(solution.volume.magnitude, idxs, invert=True)
-        select = utils.mask(solution.volume.magnitude, idxs, invert=False)
+        clear = utils.mask(self.solution.volume.magnitude, idxs, invert=True)
+        select = utils.mask(self.solution.volume.magnitude, idxs, invert=False)
         aliquot, _ = self.solution[idxs].aliquot(volume)
-        source = select * self.solution.aliquot(volume) + clear * self.solution
+        print(self.solution.aliquot(volume)[0].__class__)
+        source = self.solution.aliquot(volume)[0] * select
+        source = source + self.solution * clear
         return aliquot, source

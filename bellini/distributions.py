@@ -3,7 +3,7 @@
 # =============================================================================
 import abc
 import bellini
-from bellini.api.utils import isarr
+from bellini.api import utils
 from bellini.units import *
 
 # =============================================================================
@@ -102,6 +102,10 @@ class Distribution(abc.ABC):
     def units(self):
         raise NotImplementedError
 
+    @property
+    def shape(self):
+        return self.magnitude.shape
+
     def __add__(self, x):
         return ComposedDistribution([self, x], op="add")
 
@@ -118,6 +122,8 @@ class Distribution(abc.ABC):
         return TransformedDistribution(self, op='neg')
 
     def __mul__(self, x):
+        if isinstance(x, bellini.Species):
+            return NotImplemented
         return ComposedDistribution([self, x], op="mul")
 
     def __rmul__(self, x):
@@ -156,7 +162,7 @@ class Distribution(abc.ABC):
         parameters = self.parameters.copy()
         print(parameters)
         for name, param in parameters.items():
-            if isarr(param):
+            if utils.isarr(param):
                 parameters[name] = param[idxs]
         instance = self.__class__(
             observed=self.observed,
@@ -175,6 +181,7 @@ class ComposedDistribution(Distribution):
     def __init__(self, distributions, op):
         super(ComposedDistribution, self).__init__()
         assert len(distributions) == 2 # two at a time
+        assert utils.check_shape(*distributions)
         self.distributions = distributions
         self.op = op
 
@@ -290,7 +297,7 @@ class TransformedDistribution(Distribution):
     @property
     def magnitude(self):
         return OPS[self.op](
-            self.distribution
+            self.distribution.magnitude
         )
 
     @property
