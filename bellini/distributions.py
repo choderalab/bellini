@@ -3,6 +3,7 @@
 # =============================================================================
 import abc
 import bellini
+from bellini.api.utils import isarr
 from bellini.units import *
 
 # =============================================================================
@@ -151,6 +152,18 @@ class Distribution(abc.ABC):
     def __log__(self):
         return self.log()
 
+    def __getitem__(self, idxs):
+        parameters = self.parameters.copy()
+        print(parameters)
+        for name, param in parameters.items():
+            if isarr(param):
+                parameters[name] = param[idxs]
+        instance = self.__class__(
+            observed=self.observed,
+            name=self.name,
+            **parameters)
+        return instance
+
 
 class SimpleDistribution(Distribution):
     def __init__(self, *args, **kwargs):
@@ -231,6 +244,15 @@ class ComposedDistribution(Distribution):
                 mag = f"{self.magnitude:.2f}"
             return f'CompDist w mag {mag} {self.units:~P}'
 
+    def __getitem__(self, idxs):
+        return ComposedDistribution(
+            (
+                self.distributions[0][idxs],
+                self.distributions[1][idxs]
+            ),
+            op = self.op
+        )
+
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
@@ -290,6 +312,12 @@ class TransformedDistribution(Distribution):
             return ureg.dimensionless
         else:
             raise NotImplementedError("computing units for given operation not supported")
+
+    def __getitem__(self, idxs):
+        return TransformedDistribution(
+            self.distribution[idxs],
+            op = self.op
+        )
 
 
 # =============================================================================

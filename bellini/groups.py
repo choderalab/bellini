@@ -8,6 +8,7 @@ import torch
 import bellini
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution
+from bellini.api import utils
 from bellini.units import *
 #ureg = pint.UnitRegistry()
 
@@ -223,6 +224,13 @@ class Substance(Group):
     def __hash__(self):
         return hash(self.moles) + hash(self.species)
 
+    def __getitem__(self, idxs):
+        assert utils.isarr(self.moles)
+        return Substance(
+            self.species,
+            self.moles[idxs]
+        )
+
 
 class Liquid(Group):
     @abc.abstractmethod
@@ -296,13 +304,28 @@ class Solvent(Liquid):
 
         return aliquot, source
 
+    def __getitem__(self, idxs):
+        assert utils.isarr(self.volume)
+        return Solvent(
+            self.species,
+            self.volume[idxs]
+        )
+
 
 class Mixture(Group):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
 
         sub_dict = {}
+        shape = None
         for sub in substances:
+            if utils.isarr(sub.moles) and shape is None:
+                shape = sub.moles.shape
+            elif shape and utils.isarr(sub.moles):
+                assert sub.moles.shape == shape, "shape of all substance Quantities must be the same"
+            elif shape and not utils.isarr(sub.moles):
+                raise ValueError("if mixture contains array Substance, all substance Quantities must be arrays")
+
             species = sub.species
             if species not in sub_dict.keys():
                 sub_dict[species] = sub
@@ -367,6 +390,15 @@ class Mixture(Group):
             + hash(sub.species)
             for sub in self.substances
         ])
+
+    def __getitem__(self, idxs):
+        substances = [
+            Substance(
+                species=substance.species,
+                moles=substance.moles[idxs],
+            ) for substance in self.substances
+        ]
+        return Mixture(substances=substances)
 
 class Solution(Liquid):
     def __init__(self, mixture, solvent, **values):
@@ -436,6 +468,12 @@ class Solution(Liquid):
         return Solution(
             mixture = x * self.mixture,
             solvent = x * self.solvent
+        )
+
+    def __getitem__(self, idxs):
+        return Solution(
+            mixture=self.mixture[idxs],
+            solvent=self.solvent[idxs]
         )
 
     def aliquot(self, volume):
@@ -522,14 +560,12 @@ class Container(Group):
 class WellArray(Container):
     """ An array of Containers (e.g. well plate). Must contain an array """
     def __init__(self, solution=None, **values):
-        assert (isinstance(solution.volume.magnitude, np.ndarray) or
-                isinstance(solution.volume.magnitude, jnp.ndarray))
-        assert len(solution.volume.magnitude.shape) == 2 # force plate to be 2d
+        assert utils.isarr(solution.volume.magnitude)
         super(WellArray, self).__init__(solution=solution, **values)
 
-    def retrieve_well_aliquot(self, row, column, volume):
-        assert self.solution is not None
-        raise NotImplementedError()
-
-    def receive_well_aliquot(self, idx, volume):
-        raise NotImplementedError()
+    def subset_aliquot(self, idxs, volume):
+        clear = utils.mask(solution.volume.magnitude, idxs, invert=True)
+        select = utils.mask(solution.volume.magnitude, idxs, invert=False)
+        aliquot, _ = self.solution[idxs].aliquot(volume)
+        source = select * self.solution.aliquot(volume) + clear * self.solution
+        return aliquot, source
