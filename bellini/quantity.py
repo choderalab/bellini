@@ -5,6 +5,7 @@
 import numpy as np
 import jax.numpy as jnp
 import torch
+import bellini
 import bellini.distributions as dist
 from bellini.units import *
 # =============================================================================
@@ -19,22 +20,50 @@ class Quantity(pint.quantity.Quantity):
     def _convert_to_numpy(x):
         if isinstance(x, float):
             return x
+        elif isinstance(x, np.generic):
+            return x
         elif isinstance(x, np.ndarray):
             return x
+        elif isinstance(x, jnp.ndarray):
+            return np.array(x)
+        elif isinstance(x, torch.Tensor):
+            # TODO:
+            # do not require torch import ahead of time
+            return x.numpy()
+        print(type(x))
+        raise ValueError("input could not be converted to numpy!")
+
+    @staticmethod
+    def _convert_to_jnp(x):
+        if isinstance(x, float):
+            return x
+        elif isinstance(x, np.ndarray) or isinstance(x, np.generic):
+            return jnp.array(x)
         elif isinstance(x, jnp.ndarray):
             return x
         elif isinstance(x, torch.Tensor):
             # TODO:
             # do not require torch import ahead of time
-            return x.numpy()
-        raise ValueError("input could not be converted to numpy!")
+            return jnp.array(x)
+        raise ValueError("input could not be converted to jnp!")
 
-    def __new__(self, value, unit, name=None):
-        value = self._convert_to_numpy(value)
+    def __new__(self, value, unit, name=None, infer=False):
+        if infer:
+            value = self._convert_to_jnp(value)
+        else:
+            value = self._convert_to_numpy(value)
         if name is None:
             name = repr(self)
         self.name = name
         return super(Quantity, self).__new__(self, value, unit)
+
+    # return self but jnp.ndarray
+    def jnp(self):
+        value = self._convert_to_jnp(self.magnitude)
+        unit = self.units
+        instance = super(Quantity, self).__new__(self.__class__, value, unit)
+        instance.name = self.name
+        return instance
 
     def _build_graph(self):
         import networkx as nx
@@ -52,24 +81,32 @@ class Quantity(pint.quantity.Quantity):
     def __add__(self, x):
         if isinstance(x, dist.Distribution):
             return x + self
+        elif isinstance(x, bellini.groups.Group):
+            raise NotImplementedError()
         else:
             return super(Quantity, self).__add__(x)
 
     def __sub__(self, x):
         if isinstance(x, dist.Distribution):
             return -x + self
+        elif isinstance(x, bellini.groups.Group):
+            raise NotImplementedError()
         else:
             return super(Quantity, self).__sub__(x)
 
     def __mul__(self, x):
         if isinstance(x, dist.Distribution):
             return x * self
+        elif isinstance(x, bellini.groups.Group):
+            raise NotImplementedError()
         else:
             return super(Quantity, self).__mul__(x)
 
     def __truediv__(self, x):
         if isinstance(x, dist.Distribution):
             return (x ** -1) * self
+        elif isinstance(x, bellini.groups.Group):
+            raise NotImplementedError()
         else:
             return super(Quantity, self).__truediv__(x)
 

@@ -4,6 +4,11 @@
 import numpyro
 import bellini
 
+
+# =============================================================================
+# Compilation
+# =============================================================================
+
 def graph_to_numpyro_model(g):
     """ Convert a belief graph to a `numpyro` model.
 
@@ -38,7 +43,7 @@ def graph_to_numpyro_model(g):
                 return
             elif isinstance(node, bellini.quantity.Quantity):
                 #print(node, "param", id(node))
-                model_dict[node] = node
+                model_dict[node] = node.jnp()
             else:
                 if isinstance(node, bellini.distributions.SimpleDistribution):
                     if node is observed_node:
@@ -63,10 +68,12 @@ def graph_to_numpyro_model(g):
                         ),
                         obs = obs_data
                     )
+                    #print(name, sample, obs_data)
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
+                        infer=True
                     )
                     #print(name, "simple", model_dict[id(node)], id(node))
 
@@ -90,6 +97,7 @@ def graph_to_numpyro_model(g):
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
+                        infer=True
                     )
 
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
@@ -113,7 +121,9 @@ def graph_to_numpyro_model(g):
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
+                        infer=True
                     )
+            #print(node, model_dict[node])
 
         eval_node(observed_node)
 
