@@ -17,17 +17,20 @@ def test_init():
 def test_mix():
     from bellini.distributions import Normal
     from bellini import Quantity
+    import bellini.api.functional as F
     import pint
     ureg = pint.UnitRegistry()
+    import bellini
+    bellini.verbose = True
 
     x = Normal(
         loc=Quantity(0.0, unit='liter'),
         scale=Quantity(1.0, unit=ureg.liter),
     )
 
-    y = Normal(
+    y = F.exp(Normal(
         loc=Quantity(0.0, unit='liter'),
         scale=Quantity(2.0, unit=ureg.liter),
-    ).exp()
+    ))
 
     z = x + y

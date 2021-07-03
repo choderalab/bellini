@@ -1,7 +1,6 @@
 # =============================================================================
 # IMPORTS
 # =============================================================================
-#import pint
 import numpy as np
 import jax.numpy as jnp
 import torch
@@ -48,8 +47,8 @@ class Quantity(pint.quantity.Quantity):
             return jnp.array(x)
         raise ValueError("input could not be converted to jnp!")
 
-    def __new__(self, value, unit=None, name=None, infer=False):
-        if infer:
+    def __new__(self, value, unit=None, name=None):
+        if bellini.infer:
             value = self._convert_to_jnp(value)
         else:
             value = self._convert_to_numpy(value)

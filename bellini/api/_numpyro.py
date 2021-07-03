@@ -3,7 +3,8 @@
 # =============================================================================
 import numpyro
 import bellini
-
+import bellini.api.functional as F
+import jax.numpy as jnp
 
 # =============================================================================
 # Compilation
@@ -35,6 +36,7 @@ def graph_to_numpyro_model(g):
     observed_node = observed_nodes[0]
 
     def model(obs = None):
+        bellini.set_infer(True)
         model_dict = {}
 
         def eval_node(node):
@@ -42,7 +44,6 @@ def graph_to_numpyro_model(g):
             if node in model_dict.keys():
                 return
             elif isinstance(node, bellini.quantity.Quantity):
-                #print(node, "param", id(node))
                 model_dict[node] = node.jnp()
             else:
                 if isinstance(node, bellini.distributions.SimpleDistribution):
@@ -68,19 +69,15 @@ def graph_to_numpyro_model(g):
                         ),
                         obs = obs_data
                     )
-                    #print(name, sample, obs_data)
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
-                        infer=True
                     )
-                    #print(name, "simple", model_dict[id(node)], id(node))
 
                 elif isinstance(node, bellini.distributions.ComposedDistribution):
                     name = node.name
-                    #print(name, "composed", id(node))
-                    op = bellini.distributions.OPS[node.op]
+                    op = getattr(F, node.op)
                     distributions = node.distributions
                     for param in distributions:
                         eval_node(param)
@@ -97,23 +94,20 @@ def graph_to_numpyro_model(g):
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
-                        infer=True
                     )
 
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
                     name = node.name
-                    op = bellini.distributions.OPS[node.op]
-                    eval_node(node.distribution)
+                    op = getattr(jnp, node.op)
+                    for arg in node.args:
+                        eval_node(arg)
 
-                    if op == 'pow':
-                        sample = op(
-                            model_dict[node.distribution.magnitude],
-                            node.order
-                        )
-                    else:
-                        sample = op(
-                            model_dict[node.distribution.magnitude]
-                        )
+                    jax_args = [
+                        model_dict[arg].magnitude
+                        for arg in node.args
+                    ]
+
+                    sample = op(*jax_args, **node.kwargs)
 
                     if getattr(node, "trace", None):
                         numpyro.deterministic(node.name, sample)
@@ -121,12 +115,11 @@ def graph_to_numpyro_model(g):
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
                         node.units,
-                        infer=True
                     )
-            #print(node, model_dict[node])
 
         eval_node(observed_node)
 
+        bellini.set_infer(False)
         return model_dict[observed_node].magnitude, model_dict
 
     return model

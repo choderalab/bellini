@@ -5,20 +5,8 @@ import abc
 import bellini
 from bellini.api import utils
 from bellini.units import *
-
-# =============================================================================
-# CONSTANTS
-# =============================================================================
-OPS = {
-    "add": lambda x, y: x + y,
-    "sub": lambda x, y: x - y,
-    "mul": lambda x, y: x * y,
-    "div": lambda x, y: x / y,
-    "exp": lambda x: x.exp(),
-    "log": lambda x: x.log(),
-    "neg": lambda x: -x,
-    "pow": lambda x, y: x ** y,
-}
+import bellini.api.functional as F
+import numpy as np
 
 # =============================================================================
 # BASE CLASSES
@@ -119,10 +107,12 @@ class Distribution(abc.ABC):
         return ComposedDistribution([x, self], op="sub")
 
     def __neg__(self):
-        return TransformedDistribution(self, op='neg')
+        return TransformedDistribution([self], op='neg')
 
     def __mul__(self, x):
         if isinstance(x, bellini.Species):
+            # allows us to define Substances from Species
+            # by multiplying by Distributions
             return NotImplemented
         return ComposedDistribution([self, x], op="mul")
 
@@ -136,31 +126,13 @@ class Distribution(abc.ABC):
         return ComposedDistribution([x, self], op="div")
 
     def __pow__(self, x):
-        return TransformedDistribution(self, op="pow", order=x)
+        return TransformedDistribution([self, x], op="power")
 
     def __rpow__(self, x):
-        return TransformedDistribution(x, op="pow", order=self)
-
-    def __abs__(self):
-        return TransformedDistribution(self, op="abs")
-
-    def exp(self):
-        # TODO: re-write math
-        return TransformedDistribution(self, op="exp")
-
-    def __exp__(self):
-        return self.exp()
-
-    def log(self):
-        # TODO: re-write math
-        return TransformedDistribution(self, op="log")
-
-    def __log__(self):
-        return self.log()
+        return TransformedDistribution([x, self], op="power")
 
     def __getitem__(self, idxs):
         parameters = self.parameters.copy()
-        print(parameters)
         for name, param in parameters.items():
             if utils.isarr(param):
                 parameters[name] = param[idxs]
@@ -187,32 +159,38 @@ class ComposedDistribution(Distribution):
 
     @property
     def magnitude(self):
-        return OPS[self.op](
+        return getattr(F, self.op)(
             self.distributions[0].magnitude,
             self.distributions[1].magnitude,
         )
 
     @property
     def dimensionality(self):
-        if self.op == "add" or self.op == "sub":
-            return self.distributions[0].dimensionality
-        elif self.op == "mul":
-            return self.distributions[0].dimensionality * self.distributions[1].dimensionality
-        elif self.op == "div":
-            return self.distributions[0].dimensionality / self.distributions[1].dimensionality
-        else:
-            raise Exception("cannot compute dimensionality for given operation")
+        try:
+            with bellini.inference(False):
+                np_args = [
+                    bellini.Quantity(arg.magnitude, arg.units)
+                    for arg in self.distributions
+                ]
+                return getattr(F, self.op)(
+                    *np_args,
+                ).dimensionality
+        except ValueError:
+            raise NotImplementedError("computing dimensionality for given operation not supported")
 
     @property
     def units(self):
-        if self.op == "add" or self.op == "sub":
-            return self.distributions[0].units
-        elif self.op == "mul":
-            return self.distributions[0].units * self.distributions[1].units
-        elif self.op == "div":
-            return self.distributions[0].units / self.distributions[1].units
-        else:
-            raise Exception("cannot compute units for given operation")
+        try:
+            with bellini.inference(False):
+                np_args = [
+                    bellini.Quantity(arg.magnitude, arg.units)
+                    for arg in self.distributions
+                ]
+                return getattr(F, self.op)(
+                    *np_args,
+                ).units
+        except ValueError:
+            raise NotImplementedError("computing dimensionality for given operation not supported")
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -263,67 +241,90 @@ class ComposedDistribution(Distribution):
 
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
-    def __init__(self, distribution, op, **kwargs):
+    def __init__(self, args, op, **kwargs):
         super(TransformedDistribution, self).__init__()
-        self.distribution = distribution
+        args_contains_dist = np.array([
+            isinstance(arg, Distribution)
+            for arg in args
+        ]).any()
+        assert args_contains_dist, "TransformedDistribution must have an Distribution as an argument"
+
+        self.args = args
         self.op = op
         self.kwargs = kwargs
-        for key, value in kwargs.items():
-            setattr(self, key, value)
 
     def _build_graph(self):
         import networkx as nx # local import
-        g = self.distribution.g.copy() # copy original graph
+        g = nx.MultiDiGraph() # new graph
         g.add_node(
             self,
             ntype="transformed_distribution",
             op=self.op,
+            kwargs = self.kwargs
         )
-        g.add_edge(
-            self.distribution,
-            self,
-            etype="is_base_distribution_of"
-        )
+        for idx, arg in enumerate(self.args):
+            g.add_node(
+                arg,
+                ntype="arg",
+                pos=idx
+            )
+            g.add_edge(
+                arg,
+                self,
+                etype="is_arg_of"
+            )
+            g = nx.compose(g, arg.g)
         self._g = g
         return g
 
     def __repr__(self):
         return 'TransformedDistribution: (%s %s with %s)' % (
             self.op,
-            self.distribution.name,
+            self.args,
             self.kwargs,
         )
 
     @property
     def magnitude(self):
-        return OPS[self.op](
-            self.distribution.magnitude
+        return getattr(F, self.op)(
+            *[arg.magnitude for arg in self.args],
+            **self.kwargs
         )
 
     @property
     def dimensionality(self):
-        if self.op == "neg":
-            return self.distribution.dimensionality
-        elif self.op == "pow":
-            return self.distribution.dimensionality ** self.order
-        else:
+        try:
+            with bellini.inference(False):
+                np_args = [
+                    bellini.Quantity(arg.magnitude, arg.units)
+                    for arg in self.args
+                ]
+                return getattr(F, self.op)(
+                    *np_args,
+                    **self.kwargs
+                ).dimensionality
+        except ValueError:
             raise NotImplementedError("computing dimensionality for given operation not supported")
 
     @property
     def units(self):
-        if self.op == "neg":
-            return self.distribution.units
-        elif self.op == "pow":
-            return self.distribution.units ** self.order
-        elif self.op == "log" or self.op == "exp":
-            return ureg.dimensionless
-        else:
+        try:
+            with bellini.inference(False):
+                np_args = [
+                    bellini.Quantity(arg.magnitude, arg.units)
+                    for arg in self.args
+                ]
+                return getattr(F, self.op)(
+                    *np_args,
+                    **self.kwargs
+                ).units
+        except ValueError:
             raise NotImplementedError("computing units for given operation not supported")
 
     def __getitem__(self, idxs):
         return TransformedDistribution(
-            self.distribution[idxs],
-            op = self.op
+            [self, idxs],
+            op = "slice"
         )
 
 

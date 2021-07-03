@@ -164,6 +164,13 @@ class Chemical(Group):
     def __rmul__(self, x):
         return self.__mul__(x)
 
+    def _sanitize(self, x):
+        if utils.is_scalar(x):
+            x = Quantity(x, ureg.dimensionless)
+        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert x.units.dimensionality == ureg.dimensionless.dimensionality
+        return x
+
 class Species(Chemical):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
@@ -235,8 +242,7 @@ class Substance(Chemical):
             raise ValueError("Can only add Mixture or Substance to Substance")
 
     def __mul__(self, x):
-        assert isinstance(x, Quantity) or isinstance(x, Distribution)
-        assert x.units.dimensionality == ureg.dimensionless.dimensionality
+        x = self._sanitize(x)
 
         return Substance(
             self.species,
@@ -300,8 +306,7 @@ class Solvent(Liquid):
             raise ValueError("Can only add Solvent or Mixture to Ssolvent")
 
     def __mul__(self, x):
-        assert isinstance(x, Quantity) or isinstance(x, Distribution)
-        assert x.units.dimensionality == ureg.dimensionless.dimensionality
+        x = self._sanitize(x)
 
         return Solvent(
             self.species,
@@ -361,8 +366,7 @@ class Mixture(Chemical):
         return ' and '.join([str(x) for x in self.substances])
 
     def __mul__(self, x):
-        assert isinstance(x, Quantity) or isinstance(x, Distribution)
-        assert x.units.dimensionality == ureg.dimensionless.dimensionality
+        x = self._sanitize(x)
 
         return Mixture(
             [
@@ -487,8 +491,7 @@ class Solution(Liquid):
             raise NotImplementedError(f"adding between {type(self)} and {type(x)} not supported")
 
     def __mul__(self, x):
-        assert isinstance(x, Quantity) or isinstance(x, Distribution)
-        assert x.units.dimensionality == ureg.dimensionless.dimensionality
+        x = self._sanitize(x)
 
         return Solution(
             mixture = x * self.mixture,
