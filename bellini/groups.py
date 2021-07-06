@@ -254,7 +254,7 @@ class Substance(Chemical):
         return hash(self.moles) + hash(self.species)
 
     def __getitem__(self, idxs):
-        assert utils.isarr(self.moles)
+        assert utils.is_arr(self.moles)
         return Substance(
             self.species,
             self.moles[idxs]
@@ -334,7 +334,7 @@ class Solvent(Liquid):
         return aliquot, source
 
     def __getitem__(self, idxs):
-        assert utils.isarr(self.volume)
+        assert utils.is_arr(self.volume)
         return Solvent(
             self.species,
             self.volume[idxs]
@@ -348,11 +348,11 @@ class Mixture(Chemical):
         sub_dict = {}
         shape = None
         for sub in substances:
-            if utils.isarr(sub.moles) and shape is None:
+            if utils.is_arr(sub.moles) and shape is None:
                 shape = sub.moles.shape
-            elif shape and utils.isarr(sub.moles):
+            elif shape and utils.is_arr(sub.moles):
                 assert sub.moles.shape == shape, "shape of all substance Quantities must be the same"
-            elif shape and not utils.isarr(sub.moles):
+            elif shape and not utils.is_arr(sub.moles):
                 raise ValueError("if mixture contains array Substance, all substance Quantities must be arrays")
 
             species = sub.species
@@ -595,7 +595,7 @@ class Container(Group):
 class WellArray(Container):
     """ An array of Containers (e.g. well plate). Must contain an array """
     def __init__(self, solution=None, **values):
-        assert utils.isarr(solution.volume.magnitude)
+        assert utils.is_arr(solution.volume.magnitude)
         super().__init__(solution=solution, **values)
 
     def subset_aliquot(self, idxs, volume):

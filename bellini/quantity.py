@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import torch
 import bellini
 from bellini.units import *
+from bellini.api import utils
 
 # =============================================================================
 # MODULE CLASSES
@@ -98,16 +99,25 @@ class Quantity(pint.quantity.Quantity):
             return NotImplemented
         return super().__pow__(x)
 
+    def __setitem__(self, key, value):
+        if isinstance(self.magnitude, jnp.ndarray):
+            new_value = self.magnitude.at[key].set(value)
+            # ? this breaks the "functional" concept
+            # but is consistent with np syntax
+            self.magnitude = new_value
+        else:
+            super().__setitem__(key, value)
+
     def __hash__(self):
         self_base = self.to_base_units()
         # TODO: faster way to hash an array?
         # str(arr.sum()) + str((arr**2).sum()) is a possibility for large arrays
-        if isinstance(self.magnitude, (np.ndarray, jnp.ndarray)):
+        if utils.is_arr(self.magnitude):
             return hash((self_base.__class__, self_base.magnitude.tobytes(), self_base.units))
         return super().__hash__()
 
     def __eq__(self, other):
         is_eq = super().__eq__(other)
-        if isinstance(is_eq, (np.ndarray, jnp.ndarray)):
+        if utils.is_arr(is_eq):
             return is_eq.all()
         return is_eq

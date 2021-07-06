@@ -7,7 +7,7 @@ from bellini.units import *
 def is_scalar(num):
     return isinstance(num, (float, int))
 
-def isarr(arr):
+def is_arr(arr):
     if isinstance(arr, bellini.Quantity):
         arr = arr.magnitude
     return isinstance(arr, np.ndarray) or isinstance(arr, jnp.ndarray) or isinstance(arr, torch.Tensor)

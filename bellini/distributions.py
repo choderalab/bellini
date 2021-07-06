@@ -134,7 +134,7 @@ class Distribution(abc.ABC):
     def __getitem__(self, idxs):
         parameters = self.parameters.copy()
         for name, param in parameters.items():
-            if utils.isarr(param):
+            if utils.is_arr(param):
                 parameters[name] = param[idxs]
         instance = self.__class__(
             observed=self.observed,
@@ -223,7 +223,7 @@ class ComposedDistribution(Distribution):
         else:
             import numpy as np
             import jax.numpy as jnp
-            if isinstance(self.magnitude, (np.ndarray,jnp.ndarray)):
+            if utils.is_arr(self.magnitude)):
                 mag = repr(self.magnitude)
             else:
                 mag = f"{self.magnitude:.2f}"
