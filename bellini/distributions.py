@@ -223,7 +223,7 @@ class ComposedDistribution(Distribution):
         else:
             import numpy as np
             import jax.numpy as jnp
-            if utils.is_arr(self.magnitude)):
+            if utils.is_arr(self.magnitude):
                 mag = repr(self.magnitude)
             else:
                 mag = f"{self.magnitude:.2f}"
