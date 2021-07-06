@@ -5,7 +5,6 @@ import numpy as np
 import jax.numpy as jnp
 import torch
 import bellini
-import bellini.distributions as dist
 from bellini.units import *
 
 # =============================================================================
@@ -18,50 +17,46 @@ class Quantity(pint.quantity.Quantity):
 
     @staticmethod
     def _convert_to_numpy(x):
-        if isinstance(x, float) or isinstance(x, int):
+        if isinstance(x, (float, int)):
             return np.array(x)
-        elif isinstance(x, np.generic):
-            return x
-        elif isinstance(x, np.ndarray):
+        elif isinstance(x, (np.generic, np.ndarray)):
             return x
         elif isinstance(x, jnp.ndarray):
             return np.array(x)
         elif isinstance(x, torch.Tensor):
-            # TODO:
-            # do not require torch import ahead of time
+            # TODO: do not require torch import ahead of time
             return x.numpy()
         print(type(x))
         raise ValueError("input could not be converted to numpy!")
 
     @staticmethod
     def _convert_to_jnp(x):
-        if isinstance(x, float) or isinstance(x, int):
+        if isinstance(x, (float, int)):
             return jnp.array(x)
-        elif isinstance(x, np.ndarray) or isinstance(x, np.generic):
+        elif isinstance(x, (np.generic, np.ndarray)):
             return jnp.array(x)
         elif isinstance(x, jnp.ndarray):
             return x
         elif isinstance(x, torch.Tensor):
-            # TODO:
-            # do not require torch import ahead of time
+            # TODO: do not require torch import ahead of time
             return jnp.array(x)
         raise ValueError("input could not be converted to jnp!")
 
-    def __new__(self, value, unit=None, name=None):
+    def __new__(cls, value, unit=None, name=None):
         if bellini.infer:
-            value = self._convert_to_jnp(value)
+            value = cls._convert_to_jnp(value)
         else:
-            value = self._convert_to_numpy(value)
+            value = cls._convert_to_numpy(value)
         if name is None:
-            name = repr(self)
-        self.name = name
-        return super(Quantity, self).__new__(self, value, unit)
+            name = repr(cls)
+        cls.name = name
+        return super().__new__(cls, value, unit)
 
-    # return self but jnp.ndarray
     def jnp(self):
+        r""" return self but jnp.ndarray """
         value = self._convert_to_jnp(self.magnitude)
         unit = self.units
-        instance = super(Quantity, self).__new__(self.__class__, value, unit)
+        instance = super().__new__(self.__class__, value, unit)
         instance.name = self.name
         return instance
 
@@ -79,47 +74,40 @@ class Quantity(pint.quantity.Quantity):
         return self._g
 
     def __add__(self, x):
-        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+        if isinstance(x, (bellini.Distribution, bellini.Group)):
             return NotImplemented
-        else:
-            return super(Quantity, self).__add__(x)
+        return super().__add__(x)
 
     def __sub__(self, x):
-        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+        if isinstance(x, (bellini.Distribution, bellini.Group)):
             return NotImplemented
-        else:
-            return super(Quantity, self).__sub__(x)
+        return super().__sub__(x)
 
     def __mul__(self, x):
-        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+        if isinstance(x, (bellini.Distribution, bellini.Group)):
             return NotImplemented
-        else:
-            return super(Quantity, self).__mul__(x)
+        return super().__mul__(x)
 
     def __truediv__(self, x):
-        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+        if isinstance(x, (bellini.Distribution, bellini.Group)):
             return NotImplemented
-        else:
-            return super(Quantity, self).__truediv__(x)
+        return super().__truediv__(x)
 
     def __pow__(self, x):
-        if isinstance(x, dist.Distribution) or isinstance(x, bellini.Group):
+        if isinstance(x, (bellini.Distribution, bellini.Group)):
             return NotImplemented
-        else:
-            return super(Quantity, self).__pow__(x)
+        return super().__pow__(x)
 
     def __hash__(self):
         self_base = self.to_base_units()
         # TODO: faster way to hash an array?
         # str(arr.sum()) + str((arr**2).sum()) is a possibility for large arrays
-        if isinstance(self.magnitude, np.ndarray) or isinstance(self.magnitude, jnp.ndarray):
+        if isinstance(self.magnitude, (np.ndarray, jnp.ndarray)):
             return hash((self_base.__class__, self_base.magnitude.tobytes(), self_base.units))
-        else:
-            return super(Quantity, self).__hash__()
+        return super().__hash__()
 
     def __eq__(self, other):
-        is_eq = super(Quantity, self).__eq__(other)
-        if isinstance(is_eq, np.ndarray) or isinstance(is_eq, jnp.ndarray):
+        is_eq = super().__eq__(other)
+        if isinstance(is_eq, (np.ndarray, jnp.ndarray)):
             return is_eq.all()
-        else:
-            return is_eq
+        return is_eq

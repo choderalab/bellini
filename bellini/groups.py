@@ -5,7 +5,7 @@ import abc
 import pint
 import numpy as np
 import torch
-import bellini
+from bellini.laws import Law
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution
 from bellini.api import utils
@@ -44,7 +44,7 @@ class Group(abc.ABC):
 
         # to compose or to not to compose?
         for name, value in self.values.items():
-            if isinstance(value, list) or isinstance(value, tuple):
+            if isinstance(value, (list, tuple)):
                 for v in value:
                     #print(v)
                     g.add_node(
@@ -113,9 +113,8 @@ class Group(abc.ABC):
     def __getattr__(self, name):
         if name in self.values:
             return self.values[name]
-
         else:
-            super(Group, self).__getattribute__(name)
+            return super().__getattribute__(name)
 
     def __eq__(self, new_group):
         return {
@@ -136,7 +135,7 @@ class Group(abc.ABC):
                     setattr(self, name, value)
 
     def add_law(self, law):
-        assert isinstance(law, bellini.laws.Law)
+        assert isinstance(law, Law)
         """
         _from, _to, _lamb = law
         assert isinstance(_from, dict)
@@ -167,14 +166,14 @@ class Chemical(Group):
     def _sanitize(self, x):
         if utils.is_scalar(x):
             x = Quantity(x, ureg.dimensionless)
-        assert isinstance(x, Quantity) or isinstance(x, Distribution)
+        assert isinstance(x, (Quantity, Distribution))
         assert x.units.dimensionality == ureg.dimensionless.dimensionality
         return x
 
 class Species(Chemical):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
-        super(Species, self).__init__(name=name, **values)
+        super().__init__(name=name, **values)
 
     def __add__(self, x):
         return NotImplemented
@@ -182,7 +181,7 @@ class Species(Chemical):
     def __mul__(self, quantity):
         """ Species times quantity equals substance. """
         # check quantity is in mole
-        assert isinstance(quantity, Quantity) or isinstance(quantity, Distribution)
+        assert isinstance(quantity, (Quantity, Distribution))
         if quantity.units.dimensionality == ureg.mole.dimensionality:
             return Substance(
                 species=self,
@@ -193,6 +192,8 @@ class Species(Chemical):
                 species=self,
                 volume=quantity
             )
+        else:
+            raise ValueError(f"{self} and {quantity} cannot be multiplied")
 
     def __repr__(self):
         return self.name
@@ -210,7 +211,7 @@ class Substance(Chemical):
             Species,
         )
 
-        super(Substance, self).__init__(
+        super().__init__(
             species=species,
             moles=moles,
             **values
@@ -274,7 +275,7 @@ class Solvent(Liquid):
             Species,
         )
 
-        super(Solvent, self).__init__(
+        super().__init__(
             species=species,
             volume=volume,
             **values
@@ -360,7 +361,7 @@ class Mixture(Chemical):
             else:
                 sub_dict[species] = sub_dict[species] + sub
 
-        super(Mixture, self).__init__(substances=tuple(sub_dict.values()), **values)
+        super().__init__(substances=tuple(sub_dict.values()), **values)
 
     def __repr__(self):
         return ' and '.join([str(x) for x in self.substances])
@@ -409,6 +410,9 @@ class Mixture(Chemical):
                 mixture = mixture + substance
             return mixture
 
+        else:
+            raise ValueError(f"{self} and {x} cannot be added")
+
     def __eq__(self, x):
         return list(set(self.substances)) == list(set(self.substances))
 
@@ -449,7 +453,7 @@ class Solution(Liquid):
                 for substance in mixture.substances
             }
 
-        super(Solution, self).__init__(
+        super().__init__(
             mixture=mixture,
             solvent=solvent,
             **values
@@ -556,7 +560,7 @@ class Container(Group):
     def __init__(self, solution=None, **values):
         if solution is not None:
             assert isinstance(solution, Liquid)
-        super(Container, self).__init__(solution = solution, **values)
+        super().__init__(solution = solution, **values)
 
     @property
     def volume(self):
@@ -592,7 +596,7 @@ class WellArray(Container):
     """ An array of Containers (e.g. well plate). Must contain an array """
     def __init__(self, solution=None, **values):
         assert utils.isarr(solution.volume.magnitude)
-        super(WellArray, self).__init__(solution=solution, **values)
+        super().__init__(solution=solution, **values)
 
     def subset_aliquot(self, idxs, volume):
         clear = utils.mask(self.solution.volume.magnitude, idxs, invert=True)

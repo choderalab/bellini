@@ -145,13 +145,13 @@ class Distribution(abc.ABC):
 
 class SimpleDistribution(Distribution):
     def __init__(self, *args, **kwargs):
-        super(SimpleDistribution, self).__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
     def __init__(self, distributions, op):
-        super(ComposedDistribution, self).__init__()
+        super().__init__()
         assert len(distributions) == 2 # two at a time
         assert utils.check_shape(*distributions)
         self.distributions = distributions
@@ -223,7 +223,7 @@ class ComposedDistribution(Distribution):
         else:
             import numpy as np
             import jax.numpy as jnp
-            if isinstance(self.magnitude, np.ndarray) or isinstance(self.magnitude, jnp.ndarray):
+            if isinstance(self.magnitude, (np.ndarray,jnp.ndarray)):
                 mag = repr(self.magnitude)
             else:
                 mag = f"{self.magnitude:.2f}"
@@ -242,7 +242,7 @@ class ComposedDistribution(Distribution):
 class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
     def __init__(self, args, op, **kwargs):
-        super(TransformedDistribution, self).__init__()
+        super().__init__()
         args_contains_dist = np.array([
             isinstance(arg, Distribution)
             for arg in args
@@ -335,7 +335,9 @@ class Normal(SimpleDistribution):
     """ Normal distribution. """
     def __init__(self, loc, scale, **kwargs):
         assert loc.dimensionality == scale.dimensionality
-        super(Normal, self).__init__(loc=loc, scale=scale, **kwargs)
+        super().__init__(**kwargs)
+        self.loc = loc
+        self.scale = scale
 
     @property
     def dimensionality(self):
@@ -351,7 +353,7 @@ class Normal(SimpleDistribution):
 
     def __repr__(self):
         if bellini.verbose:
-            return super(Normal, self).__repr__()
+            return super().__repr__()
         else:
             if not isinstance(self.loc, Distribution):
                 u = f'{self.loc:~P.2f}'
@@ -369,7 +371,9 @@ class Uniform(SimpleDistribution):
     """ Uniform distribution. """
     def __init__(self, low, high, **kwargs):
         assert low.dimensionality == high.dimensionality
-        super(Uniform, self).__init__(low=low, high=high, **kwargs)
+        super().__init__(**kwargs)
+        self.low = low
+        self.high = high
 
     @property
     def dimensionality(self):
@@ -385,7 +389,7 @@ class Uniform(SimpleDistribution):
 
     def __repr__(self):
         if bellini.verbose:
-            return super(Uniform, self).__repr__()
+            return super().__repr__()
         else:
             if not isinstance(self.low, Distribution):
                 low = f'{self.low:~P.2f}'
