@@ -109,15 +109,21 @@ class Distribution(abc.ABC):
         return self.magnitude.shape
 
     def __add__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([self, x], op="add")
 
     def __radd__(self, x):
         return self.__add__(x)
 
     def __sub__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([self, x], op="sub")
 
     def __rsub__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([x, self], op="sub")
 
     def __neg__(self):
@@ -128,21 +134,31 @@ class Distribution(abc.ABC):
             # allows us to define Substances from Species
             # by multiplying by Distributions
             return NotImplemented
+        elif utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([self, x], op="mul")
 
     def __rmul__(self, x):
         return self.__mul__(x)
 
     def __truediv__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([self, x], op="div")
 
     def __rtruediv__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return ComposedDistribution([x, self], op="div")
 
     def __pow__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return TransformedDistribution([self, x], op="power")
 
     def __rpow__(self, x):
+        if utils.is_scalar(x):
+            x = bellini.Quantity(x)
         return TransformedDistribution([x, self], op="power")
 
     def __getitem__(self, idxs):
