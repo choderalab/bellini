@@ -28,18 +28,24 @@ def _fn_wrapper(fn):
             isinstance(arg, bellini.Quantity)
             for arg in args
         ])
+        """
         is_unitless = np.array([
             not hasattr(arg, "units")
             for arg in args
         ])
+        """
+        is_unitless = np.array(~(is_dist | is_quantity))
 
-        #print(is_dist, is_quantity, is_arr, fn)
+        """
+        #print(is_dist, is_quantity, is_unitless, fn)
         assert (is_dist | is_quantity | is_unitless).all(), (
             "bellini.api.functional only takes Quantities"
             ", Distributions, and unitless scalars/arrays as args"
         )
+        """
 
         if is_unitless.all():
+            #print(fn, type(fn))
             return fn(*args, **kwargs)
         else:
             if is_unitless.any():
@@ -47,9 +53,11 @@ def _fn_wrapper(fn):
                              " if this is not the desired behavior, consider stripping"
                              " units first and adding them on afterwards."))
                 args = [
-                    arg if hasattr(arg, "units") else bellini.Quantity(arg, ureg.dimensionless)
+                    arg if isinstance(arg, (bellini.Quantity, bellini.Distribution)) else bellini.Quantity(arg, ureg.dimensionless)
                     for arg in args
                 ]
+
+            #print("args", args, fn)
 
             is_quantity = np.array([
                 isinstance(arg, bellini.Quantity)
@@ -61,7 +69,13 @@ def _fn_wrapper(fn):
             else:
                 assert is_quantity.all(), "@alexjli you didn't account for ur conditionals properly"
                 try:
-                    return fn(*args,**kwargs)
+                    ret = fn(*args,**kwargs)
+                    # it seems like if you apply an np function to our custom Quantity class
+                    # we get the superclass pint.Quantity back :/
+                    # so ig we just reconvert it back
+                    if isinstance(ret, pint.Quantity):
+                        ret = bellini.Quantity(ret.magnitude, ret.units)
+                    return ret
                 except DimensionalityError as e:
                     print(f"fn {fn} not compatible with args {args} kwargs {kwargs}", file=sys.stderr)
                     print("Consider stripping units before input and attaching them after computation", file=sys.stderr)
@@ -73,4 +87,8 @@ def __getattr__(name):
     if name in OPS.keys():
         return OPS[name]
     else:
-        return _fn_wrapper(getattr(np, name))
+        if bellini.infer:
+            import jax.numpy as jnp
+            return _fn_wrapper(getattr(jnp, name))
+        else:
+            return _fn_wrapper(getattr(np, name))

@@ -7,6 +7,7 @@ import torch
 import bellini
 from bellini.units import *
 from bellini.api import utils
+from pint.errors import DimensionalityError
 
 # =============================================================================
 # MODULE CLASSES
@@ -27,7 +28,7 @@ class Quantity(pint.quantity.Quantity):
         elif isinstance(x, torch.Tensor):
             # TODO: do not require torch import ahead of time
             return x.numpy()
-        print(type(x))
+        print(type(x), x)
         raise ValueError("input could not be converted to numpy!")
 
     @staticmethod
@@ -57,9 +58,27 @@ class Quantity(pint.quantity.Quantity):
         r""" return self but jnp.ndarray """
         value = self._convert_to_jnp(self.magnitude)
         unit = self.units
-        instance = super().__new__(self.__class__, value, unit)
+        instance = self.__new__(self.__class__, value, unit)
         instance.name = self.name
         return instance
+
+    def unitless(self):
+        r""" return self but unitless """
+        instance = self.__new__(self.__class__, self.magnitude)
+        instance.name = self.name
+        #print("unitless", type(instance))
+        return instance
+
+    def to_units(self, new_units, force=False):
+        try:
+            return self.to(new_units)
+        except DimensionalityError as e:
+            if not force:
+                print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True")
+                raise e
+            instance = self.__new__(self.__class__, self.magnitude, new_units)
+            instance.name = self.name
+            return instance
 
     def _build_graph(self):
         import networkx as nx

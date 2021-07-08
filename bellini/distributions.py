@@ -7,6 +7,7 @@ from bellini.api import utils
 from bellini.units import *
 import bellini.api.functional as F
 import numpy as np
+from pint.errors import DimensionalityError
 
 # =============================================================================
 # BASE CLASSES
@@ -20,6 +21,19 @@ class Distribution(abc.ABC):
         for name, parameter in parameters.items():
             # assert isinstance(parameter, Quantity)
             setattr(self, name, parameter)
+
+    @abc.abstractmethod
+    def unitless(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def to_units(self, new_units, force=False):
+        raise NotImplementedError()
+
+    def _force_units(self, new_units):
+        unitless = self.unitless()
+        unitless._units = new_units
+        return unitless
 
     @property
     def name(self):
@@ -157,40 +171,54 @@ class ComposedDistribution(Distribution):
         self.distributions = distributions
         self.op = op
 
-    @property
-    def magnitude(self):
-        return getattr(F, self.op)(
+        self._magnitude = getattr(F, self.op)(
             self.distributions[0].magnitude,
             self.distributions[1].magnitude,
         )
 
-    @property
-    def dimensionality(self):
         try:
             with bellini.inference(False):
                 np_args = [
                     bellini.Quantity(arg.magnitude, arg.units)
                     for arg in self.distributions
                 ]
-                return getattr(F, self.op)(
-                    *np_args,
-                ).dimensionality
-        except ValueError:
-            raise NotImplementedError("computing dimensionality for given operation not supported")
-
-    @property
-    def units(self):
-        try:
-            with bellini.inference(False):
-                np_args = [
-                    bellini.Quantity(arg.magnitude, arg.units)
-                    for arg in self.distributions
-                ]
-                return getattr(F, self.op)(
+                self._units = getattr(F, self.op)(
                     *np_args,
                 ).units
         except ValueError:
-            raise NotImplementedError("computing dimensionality for given operation not supported")
+            raise NotImplementedError("computing units/dimensionality for given operation not supported")
+
+    def unitless(self):
+        args = [dist.unitless() for dist in self.distributions]
+        return ComposedDistribution(
+            distributions=args,
+            op = self.op
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            return ComposedDistribution(
+                [
+                    self.distributions[0].to_units(new_units, force=force),
+                    self.distributions[1].to_units(new_units, force=force)
+                ],
+                op=self.op
+            )
+        except DimensionalityError as e:
+            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
+            raise e
+
+    @property
+    def dimensionality(self):
+        return self.units.dimensionality
+
+    @property
+    def magnitude(self):
+        return self._magnitude
+
+    @property
+    def units(self):
+        return self._units
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -215,10 +243,11 @@ class ComposedDistribution(Distribution):
 
     def __repr__(self):
         if bellini.verbose:
-            return 'ComposedDistriubution: (%s %s %s)' % (
-                repr(self.distributions[0]),
+            return 'ComposedDistriubution: (%s %s %s)[%s]' % (
+                self.distributions[0],
                 self.op,
-                repr(self.distributions[1]),
+                self.distributions[1],
+                self.units
             )
         else:
             import numpy as np
@@ -253,6 +282,58 @@ class TransformedDistribution(Distribution):
         self.op = op
         self.kwargs = kwargs
 
+        try:
+            self._magnitude = getattr(F, self.op)(
+                *[arg.magnitude for arg in self.args],
+                **self.kwargs
+            )
+
+            with bellini.inference(False):
+                np_args = [
+                    bellini.Quantity(arg.magnitude, arg.units)
+                    for arg in self.args
+                ]
+                self._units = getattr(F, self.op)(
+                    *np_args,
+                    **self.kwargs
+                ).units
+        except ValueError:
+            raise NotImplementedError("computing units for given operation not supported")
+
+    def unitless(self):
+        args = [arg.unitless() for arg in self.args]
+        return TransformedDistribution(
+            args = args,
+            op = self.op,
+            **self.kwargs
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            scaling_factor = bellini.Quantity(1, (new_units / self.units)).to_base_units()
+            if scaling_factor.units.dimensionality == ureg.dimensionless.dimensionality:
+                scaled_dist = self * scaling_factor
+                return scaled_dist._force_units(new_units)
+            else:
+                raise DimensionalityError(self.units, new_units)
+        except DimensionalityError as e:
+            if not force:
+                print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True")
+                raise e
+            return self._force_units(new_units)
+
+    @property
+    def dimensionality(self):
+        return self.units.dimensionality
+
+    @property
+    def magnitude(self):
+        return self._magnitude
+
+    @property
+    def units(self):
+        return self._units
+
     def _build_graph(self):
         import networkx as nx # local import
         g = nx.MultiDiGraph() # new graph
@@ -278,48 +359,12 @@ class TransformedDistribution(Distribution):
         return g
 
     def __repr__(self):
-        return 'TransformedDistribution: (%s %s with %s)' % (
+        return 'TransformedDistribution: (%s %s with %s)[%s]' % (
             self.op,
-            self.args,
+            self.args,#[arg.unitless() for arg in self.args],
             self.kwargs,
+            self.units
         )
-
-    @property
-    def magnitude(self):
-        return getattr(F, self.op)(
-            *[arg.magnitude for arg in self.args],
-            **self.kwargs
-        )
-
-    @property
-    def dimensionality(self):
-        try:
-            with bellini.inference(False):
-                np_args = [
-                    bellini.Quantity(arg.magnitude, arg.units)
-                    for arg in self.args
-                ]
-                return getattr(F, self.op)(
-                    *np_args,
-                    **self.kwargs
-                ).dimensionality
-        except ValueError:
-            raise NotImplementedError("computing dimensionality for given operation not supported")
-
-    @property
-    def units(self):
-        try:
-            with bellini.inference(False):
-                np_args = [
-                    bellini.Quantity(arg.magnitude, arg.units)
-                    for arg in self.args
-                ]
-                return getattr(F, self.op)(
-                    *np_args,
-                    **self.kwargs
-                ).units
-        except ValueError:
-            raise NotImplementedError("computing units for given operation not supported")
 
     def __getitem__(self, idxs):
         return TransformedDistribution(
@@ -335,9 +380,23 @@ class Normal(SimpleDistribution):
     """ Normal distribution. """
     def __init__(self, loc, scale, **kwargs):
         assert loc.dimensionality == scale.dimensionality
-        super().__init__(**kwargs)
-        self.loc = loc
-        self.scale = scale
+        super().__init__(loc=loc, scale=scale, **kwargs)
+
+    def unitless(self):
+        return Normal(
+            loc = self.loc.unitless(),
+            scale = self.scale.unitless()
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            return Normal(
+                loc = self.loc.to_units(new_units, force=force),
+                scale = self.scale.to_units(new_units, force=force)
+            )
+        except DimensionalityError as e:
+            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
+            raise e
 
     @property
     def dimensionality(self):
@@ -364,16 +423,30 @@ class Normal(SimpleDistribution):
             else:
                 sig2 = f'{self.scale**2}'
 
-            return f'N({u}, {sig2})'
+            return f'N({u}, {sig2})[{self.units}]'
 
 
 class Uniform(SimpleDistribution):
     """ Uniform distribution. """
     def __init__(self, low, high, **kwargs):
         assert low.dimensionality == high.dimensionality
-        super().__init__(**kwargs)
-        self.low = low
-        self.high = high
+        super().__init__(low=low, high=high, **kwargs)
+
+    def unitless(self):
+        return Uniform(
+            low = self.low.unitless(),
+            high = self.high.unitless()
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            return Uniform(
+                low = self.low.to_units(new_units, force=force),
+                high = self.high.to_units(new_units, force=force)
+            )
+        except DimensionalityError as e:
+            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
+            raise e
 
     @property
     def dimensionality(self):
@@ -400,4 +473,100 @@ class Uniform(SimpleDistribution):
             else:
                 high = f'{self.high}'
 
-            return f'U({low}, {high})'
+            return f'U({low}, {high})[{self.units}]'
+
+
+class LogNormal(SimpleDistribution):
+    """ LogNormal distribution. """
+    def __init__(self, loc, scale, **kwargs):
+        assert loc.dimensionality == scale.dimensionality
+        super().__init__(loc=loc, scale=scale, **kwargs)
+
+    def unitless(self):
+        return LogNormal(
+            loc = self.loc.unitless(),
+            scale = self.scale.unitless()
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            return LogNormal(
+                loc = self.loc.to_units(new_units, force=force),
+                scale = self.scale.to_units(new_units, force=force)
+            )
+        except DimensionalityError as e:
+            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
+            raise e
+
+    @property
+    def dimensionality(self):
+        return self.loc.dimensionality
+
+    @property
+    def magnitude(self):
+        return self.loc.magnitude
+
+    @property
+    def units(self):
+        return self.loc.units
+
+    def __repr__(self):
+        if bellini.verbose:
+            return super().__repr__()
+        else:
+            if not isinstance(self.loc, Distribution):
+                u = f'{self.loc:~P.3e}'
+            else:
+                u = f'{self.loc}'
+            if not isinstance(self.scale, Distribution):
+                sig = f'{self.scale:.3e~P}'
+            else:
+                sig = f'{self.scale}'
+
+            return f'LogNorm({u}, {sig})[{self.units}]'
+
+def gen_lognorm(loc, scale):
+    assert loc.dimensionality == scale.dimensionality
+    #print("enter lognorm", loc, scale)
+    loc_units, scale_units = loc.units, scale.units
+
+    if isinstance(loc, (bellini.Quantity, bellini.Distribution)):
+        loc = loc.unitless()
+    if isinstance(scale, (bellini.Quantity, bellini.Distribution)):
+        scale = scale.unitless()
+
+    u = F.log(loc ** 2 / F.sqrt(loc ** 2 + scale ** 2))
+    sig = F.log(1 + scale ** 2 / loc ** 2)
+
+    if isinstance(u, bellini.Quantity):
+        #print("u is quant")
+        if u.dimensionality == ureg.dimensionless.dimensionality:
+            u = u.to_units(loc_units, force=True)
+    elif isinstance(u, bellini.Distribution):
+        #print("u is dist", u)
+        u = u.to_units(loc_units, force=True)
+    else:
+        #print("u is scalar")
+        #print("gen_lognorm", u)
+        u = bellini.Quantity(u, loc_units)
+
+    if isinstance(sig, bellini.Quantity):
+        if sig.dimensionality == ureg.dimensionless.dimensionality:
+            sig = sig.to_units(loc_units, force=True)
+        #print("sig is quant")
+    elif isinstance(sig, bellini.Distribution):
+        #print("sig is dist", sig)
+        sig = sig.to_units(scale_units, force=True)
+    else:
+        #print("sig is scalar")
+        #print("gen_lognorm", u)
+        sig = bellini.Quantity(scale, scale_units)
+
+    #print(u, sig)
+
+    ret = LogNormal(
+        loc=u,
+        scale=sig
+    )
+    #print(ret)
+    return ret
