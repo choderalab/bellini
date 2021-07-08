@@ -5,7 +5,7 @@ import bellini
 from bellini.units import *
 
 def is_scalar(num):
-    return isinstance(num, (float, int))
+    return isinstance(num, (float, int, np.generic))
 
 def is_arr(arr):
     if isinstance(arr, bellini.Quantity):
