@@ -292,7 +292,7 @@ class TransformedDistribution(Distribution):
             isinstance(arg, Distribution)
             for arg in args
         ]).any()
-        assert args_contains_dist, "TransformedDistribution must have an Distribution as an argument"
+        assert args_contains_dist, "TransformedDistribution must have a Distribution as an argument"
 
         self.args = args
         self.op = op
@@ -314,7 +314,7 @@ class TransformedDistribution(Distribution):
                     **self.kwargs
                 ).units
         except ValueError:
-            raise NotImplementedError("computing units for given operation not supported")
+            raise NotImplementedError("computing magnitude or units for given operation not supported")
 
     def unitless(self):
         args = [arg.unitless() for arg in self.args]
@@ -387,6 +387,83 @@ class TransformedDistribution(Distribution):
             [self, idxs],
             op = "slice"
         )
+
+
+# TODO: i need a better name for this
+class _JITDistribution(Distribution):
+    """ A wrapper for functions of random variables with multiple outputs """
+    def __init__(self, fn, inputs, label):
+        super().__init__()
+        self.fn = fn
+        self.inputs = inputs
+        self.label = label
+
+        def to_quantity(arg):
+            if isinstance(arg, bellini.Quantity):
+                return arg
+            else:
+                if isinstance(arg, (list, tuple)):
+                    return [to_quantity(r) for r in arg]
+                elif isinstance(arg, dict):
+                    return {key: to_quantity(value) for key, value in arg.items()}
+                else:
+                    return bellini.Quantity(arg.magnitude, arg.units)
+
+        deterministic_args = {}
+        for key, arg in self.inputs.items():
+            deterministic_args[key] = to_quantity(arg)
+
+        outputs = self.fn(**deterministic_args)
+        self._magnitude = outputs[label].magnitude
+        self._units = outputs[label].units
+
+    @property
+    def dimensionality(self):
+        return self.units.dimensionality
+
+    @property
+    def magnitude(self):
+        return self._magnitude
+
+    @property
+    def units(self):
+        return self._units
+
+    def __repr__(self):
+        return '_JITDistribution: (%s with inputs %s, label %s)[%s]' % (
+            self.fn,
+            self.inputs,
+            self.label,
+            self.units
+        )
+
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = nx.MultiDiGraph() # new graph
+        g.add_node(
+            self,
+            ntype="_jit_distribution",
+        )
+        for key, arg in self.inputs.items():
+            g.add_node(
+                arg,
+                ntype="arg",
+                key=key
+            )
+            g.add_edge(
+                arg,
+                self,
+                etype="is_arg_of"
+            )
+            g = nx.compose(g, arg.g)
+        self._g = g
+        return g
+
+    def unitless(self):
+        raise NotImplementedError()
+
+    def to_units(self, new_units, force=False):
+        raise NotImplementedError()
 
 
 # =============================================================================
@@ -540,6 +617,7 @@ class LogNormal(SimpleDistribution):
                 sig = f'{self.scale}'
 
             return f'LogNorm({u}, {sig})[{self.units}]'
+
 
 def gen_lognorm(loc, scale):
     assert loc.dimensionality == scale.dimensionality

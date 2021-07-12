@@ -19,11 +19,13 @@ from bellini.units import *
 class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
 
-    def __init__(self, name=None, laws=[], **values):
+    def __init__(self, name=None, **values):
         self.values = values
-        self.laws = laws
-        self.io_maps = []
         self._name = name
+
+    @abc.abstractmethod
+    def copy(self):
+        raise NotImplementedError()
 
     @property
     def name(self):
@@ -68,34 +70,6 @@ class Group(abc.ABC):
                 )
                 g = nx.compose(g, value.g)
 
-
-
-
-        # NOTE:
-        # certain quantities are independent, some are dependent
-
-        # TODO: # from JDC
-        # bake that in!!!
-
-        # TODO: # from JDC
-        # support the other case, to support reactions
-        # mass conservation
-        # equilibrium ratio
-
-        # three different
-        # simple concentration
-        # equilibirium conc, multiple conc. -> multiple conc. # with
-        # observation model
-
-
-        for io_map in self.io_maps:
-            for _from, _to in io_map:
-                g.add_edge(
-                    getattr(self, _from),
-                    getattr(self, _to),
-                    law="i need to fill this out",
-                )
-
         self._g = g
         return g
 
@@ -111,7 +85,7 @@ class Group(abc.ABC):
         return self._g
 
     def __getattr__(self, name):
-        if name in self.values:
+        if name in self.values.keys():
             return self.values[name]
         else:
             return super().__getattribute__(name)
@@ -119,30 +93,60 @@ class Group(abc.ABC):
     def __eq__(self, new_group):
         return {
                 **self.values,
-                'name': self.name, 'laws': self.laws
+                'name': self.name
             } ==  {
                 **new_group.values,
-                'name': new_group.name, 'laws': new_group.laws
+                'name': new_group.name
             }
 
-    def apply_laws(self):
-        self.io_maps = []
-        if self.laws is not None:
-            for law in self.laws:
-                new_values, io_map = law.apply(self)
-                self.io_maps.append(io_map)
-                for name, value in new_values.items():
-                    setattr(self, name, value)
+# NOTE:
+# certain quantities are independent, some are dependent
 
-    def add_law(self, law):
+# TODO: # from JDC
+# bake that in!!!
+
+# TODO: # from JDC
+# support the other case, to support reactions
+# mass conservation
+# equilibrium ratio
+
+# three different
+# simple concentration
+# equilibirium conc, multiple conc. -> multiple conc. # with
+# observation model
+
+class LawedGroup(Group):
+    def __new__(cls, group, law):
+        assert isinstance(group, Group)
         assert isinstance(law, Law)
-        """
-        _from, _to, _lamb = law
-        assert isinstance(_from, dict)
-        assert isinstance(_to, dict)
-        assert isinstance(_lamb, str)
-        """
-        self.laws.append(law)
+        return group.copy()
+
+    def __init__(self, group, law):
+        super().__init__(
+            base_group = group,
+            law = law
+        )
+
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = nx.MultiDiGraph() # new graph
+        g.add_node(
+            self,
+            ntype="lawed_group",
+            law=law,
+        )
+        g.add_node(
+            self.base_group,
+            ntype="base_group",
+        )
+        g.add_edge(
+            self.base_group,
+            self,
+            etype="is_base_group_of"
+        )
+        g = nx.compose(g, self.base_group.g)
+        self._g = g
+        return g
 
 # =============================================================================
 # Chemicals
@@ -174,6 +178,12 @@ class Species(Chemical):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
         super().__init__(name=name, **values)
+
+    def copy(self):
+        return Species(
+            name=self.name,
+            **self.values
+        )
 
     def __add__(self, x):
         return NotImplemented
@@ -215,6 +225,11 @@ class Substance(Chemical):
             species=species,
             moles=moles,
             **values
+        )
+
+    def copy(self):
+        return Substance(
+            **self.values
         )
 
     def __repr__(self):
@@ -279,6 +294,11 @@ class Solvent(Liquid):
             species=species,
             volume=volume,
             **values
+        )
+
+    def copy(self):
+        return Solvent(
+            **self.values
         )
 
     def __repr__(self):
@@ -362,6 +382,11 @@ class Mixture(Chemical):
                 sub_dict[species] = sub_dict[species] + sub
 
         super().__init__(substances=tuple(sub_dict.values()), **values)
+
+    def copy(self):
+        return Mixture(
+            **self.values
+        )
 
     def __repr__(self):
         return ' and '.join([str(x) for x in self.substances])
@@ -457,6 +482,11 @@ class Solution(Liquid):
             mixture=mixture,
             solvent=solvent,
             **values
+        )
+
+    def copy(self):
+        return Solution(
+            **self.values
         )
 
     @property
@@ -590,6 +620,9 @@ class Container(Group):
             return getattr(self.solution, value)[key]
         else:
             return getattr(self.solution, value)
+
+    def copy(self):
+        return NotImplementedError()
 
 
 class WellArray(Container):
