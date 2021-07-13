@@ -5,6 +5,7 @@ import numpyro
 import bellini
 import bellini.api.functional as F
 import jax.numpy as jnp
+from bellini.units import get_internal_units, to_internal_units, ureg
 
 # =============================================================================
 # Compilation
@@ -84,8 +85,8 @@ def graph_to_numpyro_model(g):
 
                     assert len(distributions) == 2
                     sample = op(
-                        model_dict[distributions[0]].magnitude,
-                        model_dict[distributions[1]].magnitude,
+                        to_internal_units(model_dict[distributions[0]]).magnitude,
+                        to_internal_units(model_dict[distributions[1]]).magnitude,
                     )
 
                     if getattr(node, "trace", None):
@@ -93,8 +94,9 @@ def graph_to_numpyro_model(g):
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
-                        node.units,
-                    )
+                        node.internal_units,
+                    ).to(node.units)
+
 
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
                     name = node.name
@@ -103,7 +105,7 @@ def graph_to_numpyro_model(g):
                         eval_node(arg)
 
                     jax_args = [
-                        model_dict[arg].magnitude
+                        to_internal_units(model_dict[arg]).magnitude
                         for arg in node.args
                     ]
 
@@ -114,8 +116,29 @@ def graph_to_numpyro_model(g):
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
-                        node.units,
-                    )
+                        node.internal_units,
+                    ).to(node.units)
+
+                elif isinstance(node, bellini.distributions._JITDistribution):
+                    name = node.name
+                    fn = node.fn
+                    inputs = node.inputs
+                    label = node.label
+
+                    sampled_inputs = {
+                        key: model_dict[arg]
+                        for key, arg in inputs.items()
+                    }
+
+                    sample = fn(**sampled_inputs)[label]
+
+                    if getattr(node, "trace", None):
+                        numpyro.deterministic(node.name, sample)
+
+                    model_dict[node] = bellini.quantity.Quantity(
+                        sample,
+                        node.internal_units,
+                    ).to(node.units)
 
         eval_node(observed_node)
 

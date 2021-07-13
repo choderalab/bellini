@@ -4,7 +4,7 @@
 import abc
 import bellini
 from bellini.api import utils
-from bellini.units import *
+from bellini.units import ureg, to_internal_units, get_internal_units
 import bellini.api.functional as F
 import numpy as np
 from pint.errors import DimensionalityError
@@ -104,6 +104,10 @@ class Distribution(abc.ABC):
     def units(self):
         raise NotImplementedError
 
+    @abc.abstractproperty
+    def internal_units(self):
+        raise NotImplementedError
+
     @property
     def shape(self):
         return self.magnitude.shape
@@ -187,25 +191,23 @@ class ComposedDistribution(Distribution):
         self.distributions = distributions
         self.op = op
 
-        self._magnitude = getattr(F, self.op)(
-            self.distributions[0].magnitude,
-            self.distributions[1].magnitude,
-        )
-
         try:
             with bellini.inference(False):
                 np_args = [
                     bellini.Quantity(arg.magnitude, arg.units)
                     for arg in self.distributions
                 ]
-                self._units = getattr(F, self.op)(
+                mag = getattr(F, self.op)(
                     *np_args,
-                ).units
+                )
+                self._units = mag.units
+                self._internal_units = get_internal_units(mag)
+                self._magnitude = mag.magnitude
         except ValueError:
             raise NotImplementedError("computing units/dimensionality for given operation not supported")
 
     def unitless(self):
-        args = [dist.unitless() for dist in self.distributions]
+        args = [to_internal_units(dist).unitless() for dist in self.distributions]
         return ComposedDistribution(
             distributions=args,
             op = self.op
@@ -235,6 +237,10 @@ class ComposedDistribution(Distribution):
     @property
     def units(self):
         return self._units
+
+    @property
+    def internal_units(self):
+        return self._internal_units
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -299,25 +305,23 @@ class TransformedDistribution(Distribution):
         self.kwargs = kwargs
 
         try:
-            self._magnitude = getattr(F, self.op)(
-                *[arg.magnitude for arg in self.args],
-                **self.kwargs
-            )
-
             with bellini.inference(False):
                 np_args = [
                     bellini.Quantity(arg.magnitude, arg.units)
                     for arg in self.args
                 ]
-                self._units = getattr(F, self.op)(
+                mag = getattr(F, self.op)(
                     *np_args,
                     **self.kwargs
-                ).units
+                )
+                self._magnitude = mag
+                self._units = mag.units
+                self._internal_units = get_internal_units(mag)
         except ValueError:
             raise NotImplementedError("computing magnitude or units for given operation not supported")
 
     def unitless(self):
-        args = [arg.unitless() for arg in self.args]
+        args = [to_internal_units(arg).unitless() for arg in self.args]
         return TransformedDistribution(
             args = args,
             op = self.op,
@@ -349,6 +353,10 @@ class TransformedDistribution(Distribution):
     @property
     def units(self):
         return self._units
+
+    @property
+    def internal_units(self):
+        return self._internal_units
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -416,6 +424,7 @@ class _JITDistribution(Distribution):
         outputs = self.fn(**deterministic_args)
         self._magnitude = outputs[label].magnitude
         self._units = outputs[label].units
+        self._internal_units = get_internal_units(outputs[label])
 
     @property
     def dimensionality(self):
@@ -428,6 +437,10 @@ class _JITDistribution(Distribution):
     @property
     def units(self):
         return self._units
+
+    @property
+    def internal_units(self):
+        return self._internal_units
 
     def __repr__(self):
         return '_JITDistribution: (%s with inputs %s, label %s)[%s]' % (
@@ -477,8 +490,8 @@ class Normal(SimpleDistribution):
 
     def unitless(self):
         return Normal(
-            loc = self.loc.unitless(),
-            scale = self.scale.unitless()
+            loc = to_internal_units(self.loc).unitless(),
+            scale = to_internal_units(self.scale).unitless()
         )
 
     def to_units(self, new_units, force=False):
@@ -502,6 +515,10 @@ class Normal(SimpleDistribution):
     @property
     def units(self):
         return self.loc.units
+
+    @property
+    def internal_units(self):
+        return get_internal_units(self.loc)
 
     def __repr__(self):
         if bellini.verbose:
@@ -527,8 +544,8 @@ class Uniform(SimpleDistribution):
 
     def unitless(self):
         return Uniform(
-            low = self.low.unitless(),
-            high = self.high.unitless()
+            low = to_internal_units(self.low).unitless(),
+            high = to_internal_units(self.high).unitless()
         )
 
     def to_units(self, new_units, force=False):
@@ -552,6 +569,10 @@ class Uniform(SimpleDistribution):
     @property
     def units(self):
         return self.low.units
+
+    @property
+    def internal_units(self):
+        return get_internal_units(self.low)
 
     def __repr__(self):
         if bellini.verbose:
@@ -602,6 +623,10 @@ class LogNormal(SimpleDistribution):
     @property
     def units(self):
         return self.loc.units
+
+    @property
+    def internal_units(self):
+        return get_internal_units(self.loc)
 
     def __repr__(self):
         if bellini.verbose:
