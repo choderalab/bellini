@@ -46,12 +46,22 @@ class Law(object):
         # retrieve inputs
         inputs = {}
         for kwarg, inpt in self.input_mapping.items():
-            if hasattr(group, inpt):
-                inputs[kwarg] = getattr(group, inpt)
-            elif hasattr(params, inpt):
-                inputs[kwarg] = getattr(params, inpt)
+            # if we want to grab something from an attribute that's a dict
+            if isinstance(inpt, (tuple, list)):
+                assert len(inpt) == 2, "we only support indexing one layer deep"
+                inpt, key = inpt
+                dict_attr = getattr(group, inpt, None)
+                assert isinstance(dict_attr, dict)
+                if key in dict_attr.keys():
+                    inputs[kwarg] = dict_attr[key]
+                    continue
             else:
-                raise ValueError(f"{group} and params does not have required attribute {inpt} for use as keyword {kwarg} in {self}")
+                if hasattr(group, inpt):
+                    inputs[kwarg] = getattr(group, inpt)
+                    continue
+            raise ValueError(f"{group} and params does not have required attribute {inpt} for use as keyword {kwarg} in {self}")
+
+        inputs.update(self.params)
 
         # compute values
         is_dist = np.array([

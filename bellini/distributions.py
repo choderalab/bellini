@@ -443,12 +443,15 @@ class _JITDistribution(Distribution):
         return self._internal_units
 
     def __repr__(self):
-        return '_JITDistribution: (%s with inputs %s, label %s)[%s]' % (
-            self.fn,
-            self.inputs,
-            self.label,
-            self.units
-        )
+        if bellini.verbose:
+            return '_JITDistribution: (%s with inputs %s, label %s)[%s]' % (
+                self.fn,
+                self.inputs,
+                self.label,
+                self.units
+            )
+        else:
+            return f'_JTDist: {self.fn.__name__} for {self.label} [{self.units}]'
 
     def _build_graph(self):
         import networkx as nx # local import
@@ -564,7 +567,7 @@ class Uniform(SimpleDistribution):
 
     @property
     def magnitude(self):
-        return (self.high.magnitude - self.low.magnitude)/2
+        return (self.high.magnitude + self.low.magnitude)/2
 
     @property
     def units(self):

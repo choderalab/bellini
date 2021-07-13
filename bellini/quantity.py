@@ -45,6 +45,7 @@ class Quantity(pint.quantity.Quantity):
         raise ValueError("input could not be converted to jnp!")
 
     def __new__(cls, value, unit=None, name=None):
+        assert not isinstance(value, Quantity), "value cannot be a Quantity"
         if bellini.infer:
             value = cls._convert_to_jnp(value)
         else:
