@@ -125,6 +125,9 @@ def graph_to_numpyro_model(g):
                     inputs = node.inputs
                     label = node.label
 
+                    for arg in inputs.values():
+                        eval_node(arg)
+
                     sampled_inputs = {
                         key: model_dict[arg]
                         for key, arg in inputs.items()
@@ -133,12 +136,9 @@ def graph_to_numpyro_model(g):
                     sample = fn(**sampled_inputs)[label]
 
                     if getattr(node, "trace", None):
-                        numpyro.deterministic(node.name, sample)
+                        numpyro.deterministic(node.name, sample.magnitude)
 
-                    model_dict[node] = bellini.quantity.Quantity(
-                        sample,
-                        node.internal_units,
-                    ).to(node.units)
+                    model_dict[node] = sample.to(node.units)
 
         eval_node(observed_node)
 
