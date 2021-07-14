@@ -7,31 +7,38 @@ import pint
 import numpy as np
 import jax.numpy as jnp
 import bellini
-from bellini.distributions import Distribution, Normal
+from bellini.distributions import Distribution, Normal, gen_lognorm
 from bellini.quantity import Quantity
-from bellini.units import *
+from bellini.containers import Container
+from bellini.units import VOLUME_UNIT
 
 # =============================================================================
 # BASE CLASS
 # =============================================================================
 
-class Actionable(abc.ABC):
-    """ Base class for common object that can apply an action """
-    def apply(self, parent_node, child_node, *args):
+class ActionableDevice(abc.ABC):
+    """ Base class for object that can manipulate an experiment state """
+
+    @abc.abstractmethod
+    def apply(self, experiment_state, *args, **kwargs):
+        """
+        Given an experiment state and arguments about what parts of the state to manipulate,
+        return the experiment state after manipulation
+        """
         raise NotImplementedError
 
 # =============================================================================
 # SUBMODULE CLASS
 # =============================================================================
 
-class Dispenser(Actionable):
-    """ Dispense an amount of liquid from one container to another with Gaussian error """
+class LiquidTransfer(ActionableDevice):
+    """ Transfer an amount of liquid from one container to another with Gaussian error """
     def __init__(self, name, var):
         """
         TODO: allow variance to be drawn from a prior
         """
 
-        #assert var.units == VOLUME_UNIT
+        assert var.units.dimensionality == VOLUME_UNIT.dimensionality
 
         if isinstance(var, Quantity):
             self.var = var
@@ -41,41 +48,30 @@ class Dispenser(Actionable):
         self.name = name
         self.dispense_count = 0
 
-    def apply(self, parent_node, child_node, volume, parent_final_name=None, child_final_name=None):
+    def apply(self, experiment_state, source_name, sink_name, volume):
 
-        if isinstance(parent_node.volume.magnitude, np.ndarray):
-            volume = volume * np.ones_like(parent_node.volume.magnitude)
-        elif isinstance(parent_node.volume.magnitude, jnp.ndarray):
-            volume = volume * jnp.ones_like(parent_node.volume.magnitude)
+        # retrieve source and sink containers
+        source = experiment_state[source_name]
+        sink = experiment_state[sink_name]
+        assert isinstance(source, Container)
+        assert isinstance(sink, Container)
 
+        # independent noise for each array element (TODO: is this valid?)
+        if isinstance(source.volume.magnitude, np.ndarray):
+            volume = volume * np.ones_like(source.volume.magnitude)
+        elif isinstance(source.volume.magnitude, jnp.ndarray):
+            volume = volume * jnp.ones_like(source.volume.magnitude)
 
+        # compute drawn volume
         drawn_volume = Normal(volume, self.var)
         drawn_volume.name = f"vol_transfer_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
-        aliquot = parent_node.retrieve_aliquot(drawn_volume)
-        child_node.receive_aliquot(aliquot)
 
+        # aliquot and create new experiment state
+        new_experiment_state = experiment_state.copy()
+        aliquot, new_source = source.retrieve_aliquot(drawn_volume)
+        new_sink = sink.receive_aliquot(aliquot)
+        new_experiment_state[source_name] = new_source
+        new_experiment_state[sink_name] = new_sink
 
-
-class Measurer(Actionable):
-    """ Measure a property of one container with Gaussian error """
-    def __init__(self, name, var):
-        """
-        TODO: allow variance to be drawn from a prior, update name for multiple
-        measurements
-        """
-
-        if isinstance(var, Quantity):
-            self.var = var
-        else:
-            raise ValueError("var must be a Quantity")
-
-        self.name = name
-        self.measure_count = 0
-
-    def apply(self, parent_node, value, key=None):
-        measurement = Normal(parent_node.observe(value, key=key), self.var)
-        measurement.name = f"measurement_{parent_node}_{value}_{self.measure_count}"
-        self.measure_count += 1
-        measurement.observed = True
-        return measurement
+        return new_experiment_state
