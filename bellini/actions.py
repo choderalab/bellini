@@ -17,13 +17,12 @@ from bellini.units import VOLUME_UNIT
 # =============================================================================
 
 class ActionableDevice(abc.ABC):
-    """ Base class for object that can manipulate an experiment state """
+    """ Base class for object that can manipulate experiment objects """
 
     @abc.abstractmethod
-    def apply(self, experiment_state, *args, **kwargs):
+    def apply(self, *args, **kwargs):
         """
-        Given an experiment state and arguments about what parts of the state to manipulate,
-        return the experiment state after manipulation
+        Manipulate the provided experimental objects and return the new objects
         """
         raise NotImplementedError
 
@@ -48,14 +47,7 @@ class LiquidTransfer(ActionableDevice):
         self.name = name
         self.dispense_count = 0
 
-    def apply(self, experiment_state, source_name, sink_name, volume):
-
-        # retrieve source and sink containers
-        source = experiment_state[source_name]
-        sink = experiment_state[sink_name]
-        assert isinstance(source, Container)
-        assert isinstance(sink, Container)
-
+    def apply(self, source, sink, volume):
         # independent noise for each array element (TODO: is this valid?)
         if isinstance(source.volume.magnitude, np.ndarray):
             volume = volume * np.ones_like(source.volume.magnitude)
@@ -64,14 +56,11 @@ class LiquidTransfer(ActionableDevice):
 
         # compute drawn volume
         drawn_volume = Normal(volume, self.var)
-        drawn_volume.name = f"vol_transfer_{drawn_volume.name}_{self.dispense_count}"
+        drawn_volume.name = f"{self.name}_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
 
-        # aliquot and create new experiment state
-        new_experiment_state = experiment_state.copy()
+        # aliquot and create new containers
         aliquot, new_source = source.retrieve_aliquot(drawn_volume)
         new_sink = sink.receive_aliquot(aliquot)
-        new_experiment_state[source_name] = new_source
-        new_experiment_state[sink_name] = new_sink
 
-        return new_experiment_state
+        return new_source, new_sink

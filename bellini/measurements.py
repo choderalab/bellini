@@ -20,10 +20,9 @@ class MeasurementDevice(abc.ABC):
     """ Base function for measurement instruments """
 
     @abc.abstractmethod
-    def readout(self, experiment_state, *args, **kwargs):
+    def readout(self, *args, **kwargs):
         """
-        Given an experiment state and arguments about what part of the state to measure,
-        return the measurement of this state (generally with some error)
+        Return measurement(s) of the given objects (generally with some error)
         """
         raise NotImplementedError
 
@@ -47,10 +46,9 @@ class Measurer(MeasurementDevice):
         self.name = name
         self.measure_count = 0
 
-    def readout(self, experiment_state, container_name, value, key=None):
-        container = experiment_state[container_name]
+    def readout(self, container, value, key=None):
         measurement = Normal(container.observe(value, key=key), self.var)
-        measurement.name = f"measurement_{container}_{value}_{self.measure_count}"
+        measurement.name = f"{self.name}_{container}_{value}_{self.measure_count}"
         self.measure_count += 1
         measurement.observed = True
         return measurement
