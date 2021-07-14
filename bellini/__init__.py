@@ -9,7 +9,6 @@ from .groups import *
 from .distributions import *
 from .procedure import *
 from . import quantity, groups, distributions, procedure
-from contextlib import contextmanager
 
 def set_verbose(v = True):
     global verbose
