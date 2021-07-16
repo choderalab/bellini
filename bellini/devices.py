@@ -29,6 +29,14 @@ class ActionableDevice(Device):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def apply_state(self, exp_state, *args, **kwargs):
+        """
+        Manipulate the provided experimental state and return the new modified state,
+        as well as a belief graph relating the old experimetal state to the new one.
+        """
+        raise NotImplementedError
+
 class MeasurementDevice(Device):
     """ Base function for measurement instruments """
 
@@ -36,6 +44,14 @@ class MeasurementDevice(Device):
     def readout(self, *args, **kwargs):
         """
         Return measurement(s) of the given objects (generally with some error)
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def readout_state(self, exp_state, *args, **kwargs):
+        """
+        Return measurement(s) of the experimental state (generally with some error)
+        given reference to the particular objects to measure
         """
         raise NotImplementedError
 
@@ -78,6 +94,29 @@ class LiquidTransfer(ActionableDevice):
 
         return new_source, new_sink
 
+    def apply_state(self, experiment_state, source_name, sink_name, volume):
+        # retrieve source and sink containers
+        source = experiment_state[source_name]
+        sink = experiment_state[sink_name]
+        assert isinstance(source, Container)
+        assert isinstance(sink, Container)
+
+        # get new source and sink
+        new_source, new_sink = self.apply(source, sink, volume)
+
+        # aliquot and create new experiment state
+        new_experiment_state = experiment_state.copy()
+        new_experiment_state[source_name] = new_source
+        new_experiment_state[sink_name] = new_sink
+
+        # generate belief graph
+        belief_graph = {
+            new_source: (source,),
+            new_sink: (source, sink),
+        }
+
+        return new_experiment_state, belief_graph
+
 class Measurer(MeasurementDevice):
     """ Measure a property of one container with Gaussian error """
     def __init__(self, name, var):
@@ -100,3 +139,8 @@ class Measurer(MeasurementDevice):
         self.measure_count += 1
         measurement.observed = True
         return measurement
+
+    def readout_state(self, experiment_state, container_name, value, key=None):
+        container = experiment_state[container_name]
+        measurement = self.readout(container, value, key)
+        return {(value, key): measurement} if key else {value: measurement}
