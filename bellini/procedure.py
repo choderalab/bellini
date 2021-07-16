@@ -4,7 +4,7 @@
 import abc
 import bellini
 from bellini import Quantity, Distribution, Group
-from .devices import Device, ActionableDevice, MeasurementDevice
+from bellini.devices import Device, ActionableDevice, MeasurementDevice
 from collections import OrderedDict
 
 # =============================================================================

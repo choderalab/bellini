@@ -5,7 +5,7 @@ import numpy as np
 import jax.numpy as jnp
 import torch
 import bellini
-from bellini.units import *
+import pint
 from bellini.api import utils
 from pint.errors import DimensionalityError
 

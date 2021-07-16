@@ -9,8 +9,7 @@ from bellini.laws import Law
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution
 from bellini.api import utils
-from bellini.units import *
-#ureg = pint.UnitRegistry()
+from bellini.units import ureg, VOLUME_UNIT
 
 # =============================================================================
 # BASE CLASS

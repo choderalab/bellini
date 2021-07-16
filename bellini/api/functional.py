@@ -1,5 +1,5 @@
 import bellini
-from bellini.units import *
+import pint
 import numpy as np
 import sys
 import warnings

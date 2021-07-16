@@ -3,9 +3,9 @@
 # =============================================================================
 import abc
 from bellini.units import VOLUME_UNIT
-from .quantity import Quantity
+from bellini.quantity import Quantity
 from bellini.api import utils
-from .groups import Liquid
+from bellini.groups import Liquid
 
 # =============================================================================
 # Containers

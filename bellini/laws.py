@@ -1,5 +1,4 @@
 import bellini
-from bellini.units import *
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution, _JITDistribution
 import numpy as np
