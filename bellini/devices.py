@@ -84,7 +84,7 @@ class LiquidTransfer(ActionableDevice):
             volume = volume * jnp.ones_like(source.volume.magnitude)
 
         # compute drawn volume
-        drawn_volume = Normal(volume, self.var)
+        drawn_volume = gen_lognorm(volume, self.var)
         drawn_volume.name = f"{self.name}_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
 

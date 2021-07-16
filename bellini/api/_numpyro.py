@@ -140,6 +140,21 @@ def graph_to_numpyro_model(g):
 
                     model_dict[node] = sample.to(node.units)
 
+                elif isinstance(node, bellini.distributions.UnitChangedDistribution):
+                    name = node.name
+                    dist = node.distribution
+                    eval_node(dist)
+
+                    sample = (model_dict[dist] * dist.scaling_factor).magnitude
+
+                    if getattr(node, "trace", None):
+                        numpyro.deterministic(node.name, sample)
+
+                    model_dict[node] = bellini.quantity.Quantity(
+                        sample,
+                        node.units,
+                    )
+
         eval_node(observed_node)
 
         bellini.set_infer(False)

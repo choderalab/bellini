@@ -7,6 +7,7 @@ from bellini.api import utils
 from bellini.units import ureg, to_internal_units, get_internal_units
 import bellini.api.functional as F
 import numpy as np
+import warnings
 from pint.errors import DimensionalityError
 
 # =============================================================================
@@ -29,11 +30,6 @@ class Distribution(abc.ABC):
     @abc.abstractmethod
     def to_units(self, new_units, force=False):
         raise NotImplementedError()
-
-    def _force_units(self, new_units):
-        unitless = self.unitless()
-        unitless._units = new_units
-        return unitless
 
     @property
     def name(self):
@@ -207,24 +203,17 @@ class ComposedDistribution(Distribution):
             raise NotImplementedError("computing units/dimensionality for given operation not supported")
 
     def unitless(self):
-        args = [to_internal_units(dist).unitless() for dist in self.distributions]
-        return ComposedDistribution(
-            distributions=args,
-            op = self.op
+        return self.to_units(
+            ureg.dimensionless,
+            force=True
         )
 
     def to_units(self, new_units, force=False):
-        try:
-            return ComposedDistribution(
-                [
-                    self.distributions[0].to_units(new_units, force=force),
-                    self.distributions[1].to_units(new_units, force=force)
-                ],
-                op=self.op
-            )
-        except DimensionalityError as e:
-            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
-            raise e
+        return UnitChangedDistribution(
+            self,
+            new_units,
+            force=force
+        )
 
     @property
     def dimensionality(self):
@@ -321,26 +310,17 @@ class TransformedDistribution(Distribution):
             raise NotImplementedError("computing magnitude or units for given operation not supported")
 
     def unitless(self):
-        args = [to_internal_units(arg).unitless() for arg in self.args]
-        return TransformedDistribution(
-            args = args,
-            op = self.op,
-            **self.kwargs
+        return self.to_units(
+            ureg.dimensionless,
+            force=True
         )
 
     def to_units(self, new_units, force=False):
-        try:
-            scaling_factor = bellini.Quantity(1, (new_units / self.units)).to_base_units()
-            if scaling_factor.units.dimensionality == ureg.dimensionless.dimensionality:
-                scaled_dist = self * scaling_factor
-                return scaled_dist._force_units(new_units)
-            else:
-                raise DimensionalityError(self.units, new_units)
-        except DimensionalityError as e:
-            if not force:
-                print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True")
-                raise e
-            return self._force_units(new_units)
+        return UnitChangedDistribution(
+            self,
+            new_units,
+            force=force
+        )
 
     @property
     def dimensionality(self):
@@ -476,11 +456,69 @@ class _JITDistribution(Distribution):
         return g
 
     def unitless(self):
-        raise NotImplementedError()
+        return self.to_units(
+            ureg.dimensionless,
+            force=True
+        )
 
     def to_units(self, new_units, force=False):
-        raise NotImplementedError()
+        return UnitChangedDistribution(
+            self,
+            new_units,
+            force=force
+        )
 
+
+class UnitChangedDistribution(Distribution):
+    def __init__(self, distribution, new_units, force=False):
+        assert not isinstance(distribution, UnitChangedDistribution), "can't have nested UnitChangedDistributions"
+        self.distribution = distribution
+        self._units = new_units
+        self._old_units = distribution.units
+
+        # compute scaling factor
+        scaling_factor = bellini.Quantity(1, (new_units / distribution.units)).to_base_units()
+        if scaling_factor.units.dimensionality == ureg.dimensionless.dimensionality:
+            self.scaling_factor = scaling_factor
+        else:
+            if force:
+                warnings.warn("scaling factor can't be computed. assuming the scaling factor is 1")
+                self.scaling_factor = 1
+            else:
+                raise DimensionalityError(self._old_units, self._units)
+
+        self._magnitude = self.scaling_factor * distribution.magnitude
+        self._internal_units = get_internal_units(new_units)
+
+    @property
+    def dimensionality(self):
+        return self.units.dimensionality
+
+    @property
+    def magnitude(self):
+        return self._magnitude
+
+    @property
+    def units(self):
+        return self._units
+
+    @property
+    def internal_units(self):
+        return self._internal_units
+
+    def unitless(self):
+        return UnitChangedDistribution(
+            self.distribution,
+            ureg.dimensionless,
+            force=True
+        )
+
+    def to_units(self, new_units, force=False):
+        return UnitChangedDistribution(
+            self.distribution,
+            new_units,
+            force=force
+        )
 
 # =============================================================================
 # MODULE CLASSES
