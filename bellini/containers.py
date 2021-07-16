@@ -70,3 +70,6 @@ class Container(object):
             return getattr(self.solution, value)[key]
         else:
             return getattr(self.solution, value)
+
+    def __hash__(self):
+        return hash(id(self))
