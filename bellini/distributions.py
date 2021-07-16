@@ -520,6 +520,21 @@ class UnitChangedDistribution(Distribution):
             force=force
         )
 
+
+    def _build_graph(self):
+        import networkx as nx # local import
+        g = nx.MultiDiGraph() # distribution always start with a fresh graph
+        g.add_node(self, ntype='unit_changed_distribution')
+        g.add_node(self.distribution, ntype='base_distribution')
+        g.add_edge(
+            self.distribution,
+            self,
+            etype='is_base_distribution_of',
+        )
+        g = nx.compose(g, self.distribution.g)
+        self._g = g
+        return g
+
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================

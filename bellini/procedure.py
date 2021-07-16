@@ -71,6 +71,21 @@ class Procedure(abc.ABC):
         results = device.readout_state(self.exp_state, **arg_names)
         return results
 
+    def apply_law(self, law, container_name):
+        # get container and apply law
+        container = self.exp_state[container_name]
+        lawed_container = container.apply_law(law)
+        # generate new exp state and update timeline
+        new_exp_state = self.exp_state.copy()
+        new_exp_state[container_name] = lawed_container
+        self.exp_state = new_exp_state
+        self.timeline.append(new_exp_state)
+        # update belief subgraphs
+        belief_graph = {lawed_container: (container,)}
+        self.belief_subgraphs.append((belief_graph, law))
+        # index for future exp retrieval if necessary
+        return len(self.timeline)-1
+
     def __getattr__(self, name):
         if name in self.exp_state:
             return self.exp_state[name]

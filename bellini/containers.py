@@ -62,6 +62,14 @@ class Container(object):
             new_solution = solution
         return Container(solution=new_solution, name=self.name)
 
+    def apply_law(self, law):
+        if self.solution:
+            return Container(
+                law(self.solution)
+            )
+        else:
+            raise ValueError("container has no solution to apply law to!")
+
     def __repr__(self):
         return f"Well containing {self.solution}"
 
