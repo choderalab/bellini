@@ -115,12 +115,12 @@ def test_quantity_dist_arr_unitless():
     import numpy as np
 
     x = Normal(
-        loc=Quantity(np.zeros(3), ureg.dimensionless),
+        loc=Quantity(np.ones(3), ureg.dimensionless),
         scale=Quantity(np.ones(3), ureg.dimensionless),
     )
 
     y = Quantity(
-        np.zeros(3),
+        np.ones(3),
         ureg.dimensionless
     )
 
