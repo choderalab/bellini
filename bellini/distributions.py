@@ -191,6 +191,7 @@ class ComposedDistribution(Distribution):
             with bellini.inference(False):
                 np_args = [
                     bellini.Quantity(arg.magnitude, arg.units)
+                    if not isinstance(arg, bellini.Quantity) else arg
                     for arg in self.distributions
                 ]
                 mag = getattr(F, self.op)(
@@ -297,13 +298,14 @@ class TransformedDistribution(Distribution):
             with bellini.inference(False):
                 np_args = [
                     bellini.Quantity(arg.magnitude, arg.units)
+                    if not isinstance(arg, bellini.Quantity) else arg
                     for arg in self.args
                 ]
                 mag = getattr(F, self.op)(
                     *np_args,
                     **self.kwargs
                 )
-                self._magnitude = mag
+                self._magnitude = mag.magnitude
                 self._units = mag.units
                 self._internal_units = get_internal_units(mag)
         except ValueError:

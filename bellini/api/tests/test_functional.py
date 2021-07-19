@@ -44,4 +44,3 @@ def test_scalar_dist_mix():
         Q(1, ureg.mole)
     )
     b = F.power(a, 2)
-    c = F.power(2, a)

@@ -15,6 +15,6 @@ def test_init():
 
     species = Species(name='water')
 
-    substance = Species * quantity_distribution
+    substance = species * quantity_distribution
 
     print(substance)

@@ -1,22 +1,22 @@
 import pytest
-from bellini.groups import *
-from bellini.units import *
 
-def test_quantity_distribution_scalar():
-    from bellini.distributions import Normal
+def test_quantity_dist_scalar_unitless():
+    from bellini.units import ureg
+    from bellini.distributions import Normal, ComposedDistribution, TransformedDistribution
     from bellini.quantity import Quantity
+    import bellini.api.functional as F
 
     x = Normal(
-        loc=Quantity(1.0, ureg.liter),
-        scale=Quantity(1.0, ureg.liter),
+        loc=Quantity(1.0, ureg.dimensionless),
+        scale=Quantity(1.0, ureg.dimensionless),
     )
 
     y = Quantity(
         1.0,
-        ureg.liter
+        ureg.dimensionless
     )
 
-    z = [
+    composed_dists = [
         x + y,
         y + x,
         x - y,
@@ -25,26 +25,106 @@ def test_quantity_distribution_scalar():
         y * x,
         x / y,
         y / x,
-        x ** y,
-        y ** x,
     ]
 
-def test_quantity_distribution_arr():
-    from bellini.distributions import Normal
+    for res in composed_dists:
+        assert isinstance(res, ComposedDistribution)
+        assert res.dimensionality == ureg.dimensionless.dimensionality
+
+    transformed_dists = [
+        x ** y,
+        y ** x,
+        F.exp(x),
+        F.log(x)
+    ]
+
+    for res in transformed_dists:
+        assert isinstance(res, TransformedDistribution)
+        assert res.dimensionality == ureg.dimensionless.dimensionality
+
+
+def test_quantity_dist_scalar_united():
+    from bellini.units import ureg
+    from bellini.distributions import Normal, ComposedDistribution, TransformedDistribution
     from bellini.quantity import Quantity
+    import bellini.api.functional as F
+    from pint.errors import DimensionalityError
+
+    x = Normal(
+        loc=Quantity(1.0, ureg.mole),
+        scale=Quantity(1.0, ureg.mole),
+    )
+
+    y = Quantity(
+        1.0,
+        ureg.mole
+    )
+
+    composed_dists_mole = [
+        x + y,
+        y + x,
+        x - y,
+        y - x,
+    ]
+
+    for res in composed_dists_mole:
+        assert isinstance(res, ComposedDistribution)
+        assert res.dimensionality == ureg.mole.dimensionality
+
+    composed_dists_mole_squared = [
+        x * y,
+        y * x,
+    ]
+
+    for res in composed_dists_mole_squared:
+        assert isinstance(res, ComposedDistribution)
+        assert res.dimensionality == (ureg.mole**2).dimensionality
+
+    composed_dists_unitless = [
+        x / y,
+        y / x,
+    ]
+
+    for res in composed_dists_unitless:
+        assert isinstance(res, ComposedDistribution)
+        assert res.dimensionality == ureg.dimensionless.dimensionality
+
+    def op_fails(fn):
+        try:
+            res = fn(x, y)
+            return False
+        except DimensionalityError as e:
+            return True
+
+    transformed_dists_fns = [
+        lambda x,y: x ** y,
+        lambda x,y: y ** x,
+        lambda x,y: F.exp(x),
+        lambda x,y: F.log(x)
+    ]
+
+    for fn in transformed_dists_fns:
+        assert op_fails(fn)
+
+
+def test_quantity_dist_arr_unitless():
+    from bellini.distributions import Normal, ComposedDistribution, TransformedDistribution
+    from bellini.quantity import Quantity
+    from bellini.units import ureg
+    import bellini.api.functional as F
     import numpy as np
 
     x = Normal(
-        loc=Quantity(np.zeros(3), ureg.liter),
-        scale=Quantity(np.ones(3), ureg.liter),
+        loc=Quantity(np.zeros(3), ureg.dimensionless),
+        scale=Quantity(np.ones(3), ureg.dimensionless),
     )
 
     y = Quantity(
         np.zeros(3),
-        ureg.liter
+        ureg.dimensionless
     )
 
-    z = [
+    composed_dists = [
         x + y,
         y + x,
         x - y,
@@ -53,13 +133,28 @@ def test_quantity_distribution_arr():
         y * x,
         x / y,
         y / x,
-        x ** y,
-        y ** x,
     ]
 
+    for res in composed_dists:
+        assert isinstance(res, ComposedDistribution)
+        assert res.dimensionality == ureg.dimensionless.dimensionality
+
+    transformed_dists = [
+        x ** y,
+        y ** x,
+        F.exp(x),
+        F.log(x)
+    ]
+
+    for res in transformed_dists:
+        assert isinstance(res, TransformedDistribution)
+        assert res.dimensionality == ureg.dimensionless.dimensionality
+
 def test_quantity_scalar_group_scalar():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
 
     sugar = Species("sugar")
     salt = Species("salt")
@@ -86,8 +181,10 @@ def test_quantity_scalar_group_scalar():
     ]
 
 def test_quantity_scalar_group_arr():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
     import numpy as np
 
     sugar = Species("sugar")
@@ -115,8 +212,10 @@ def test_quantity_scalar_group_arr():
     ]
 
 def test_quantity_arr_group_arr():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
     import numpy as np
 
     sugar = Species("sugar")
@@ -144,8 +243,10 @@ def test_quantity_arr_group_arr():
     ]
 
 def test_quantity_scalar_group_dist_scalar():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
 
     x = Normal(
         loc=Q(1.0, ureg.mole),
@@ -177,8 +278,11 @@ def test_quantity_scalar_group_dist_scalar():
     ]
 
 def test_quantity_scalar_group_dist_arr():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
+    import numpy as np
 
     x = Normal(
         loc=Q(np.ones(3), ureg.mole),
@@ -210,8 +314,11 @@ def test_quantity_scalar_group_dist_arr():
     ]
 
 def test_quantity_arr_group_dist_arr():
+    from bellini.groups import Species, Solution
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
+    from bellini.units import ureg
+    import numpy as np
 
     x = Normal(
         loc=Q(np.ones(3), ureg.mole),

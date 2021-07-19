@@ -4,6 +4,7 @@ import numpy as np
 import sys
 import warnings
 from pint.errors import DimensionalityError
+from bellini.units import ureg
 
 # =============================================================================
 # CONSTANTS
