@@ -1,4 +1,4 @@
-bellini_update
+bellini
 ==============================
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/choderalab/bellini/workflows/CI/badge.svg)](https://github.com/choderalab/bellini/actions?query=workflow%3ACI)
