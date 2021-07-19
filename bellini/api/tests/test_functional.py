@@ -25,11 +25,11 @@ def test_scalar_scalar_mix():
     import numpy as np
 
     a = Q(3, ureg.mole)
-    b = F.power(a, 2)
+    b = F.power(a, Q(2))
     assert b == Q(9, ureg.mole ** 2)
 
     a = Q(np.arange(3), ureg.mole)
-    b = F.power(a, 2)
+    b = F.power(a, Q(2))
     assert b == Q(np.arange(3) ** 2, ureg.mole ** 2)
 
 def test_scalar_dist_mix():
@@ -43,4 +43,4 @@ def test_scalar_dist_mix():
         Q(np.arange(3), ureg.mole),
         Q(1, ureg.mole)
     )
-    b = F.power(a, 2)
+    b = F.power(a, Q(2))
