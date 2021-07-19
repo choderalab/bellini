@@ -1,9 +1,19 @@
 name: test
 channels:
+
+  - conda-forge
+
+  - defaults
 dependencies:
     # Base depends
   - python
   - pip
+  - pytorch
+  - jax
+  - networkx
+  - numpyro
+  - numpy
+  - pint
 
     # Testing
   - pytest
