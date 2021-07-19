@@ -119,15 +119,6 @@ class Quantity(pint.quantity.Quantity):
             return NotImplemented
         return super().__pow__(x)
 
-    def __setitem__(self, key, value):
-        if isinstance(self.magnitude, jnp.ndarray):
-            new_value = self.magnitude.at[key].set(value)
-            # ? this breaks the "functional" concept
-            # but is consistent with np syntax
-            self.magnitude = new_value
-        else:
-            super().__setitem__(key, value)
-
     def __hash__(self):
         self_base = self.to_base_units()
         # TODO: faster way to hash an array?
