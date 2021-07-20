@@ -9,11 +9,11 @@ dependencies:
   - python
   - pip
   - pytorch
-  - jax=0.2.17
-  - networkx=2.6.1
-  - numpyro=0.7.1
-  - numpy=1.21.1
-  - pint=0.17
+  - jax
+  - networkx
+  - numpyro
+  - numpy
+  - pint
 
     # Testing
   - pytest
