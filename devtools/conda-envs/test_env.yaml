@@ -8,12 +8,12 @@ dependencies:
     # Base depends
   - python
   - pip
-  - pytorch
-  - jax
-  - networkx
-  - numpyro
-  - numpy
-  - pint
+  - pytorch=1.8.0
+  - jax=0.2.17
+  - networkx=2.6.1
+  - numpyro=0.7.1
+  - numpy=1.21.1
+  - pint=0.17
 
     # Testing
   - pytest
