@@ -8,7 +8,7 @@ dependencies:
     # Base depends
   - python
   - pip
-  - pytorch=1.8.0
+  - pytorch
   - jax=0.2.17
   - networkx=2.6.1
   - numpyro=0.7.1
