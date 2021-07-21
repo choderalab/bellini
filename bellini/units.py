@@ -9,9 +9,9 @@ ureg = pint.UnitRegistry()
 # CONSTANTS
 # =============================================================================
 QUANTITY_UNIT = ureg.mole
-VOLUME_UNIT = ureg.milliliter
+VOLUME_UNIT = ureg.liter
 MASS_UNIT = ureg.gram
-CONCENTRATION_UNIT = ureg.mole / ureg.milliliter
+CONCENTRATION_UNIT = ureg.mole / ureg.liter
 
 UNITS = [
     QUANTITY_UNIT,

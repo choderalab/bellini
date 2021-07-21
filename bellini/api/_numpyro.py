@@ -82,12 +82,22 @@ def graph_to_numpyro_model(g):
                         to_internal_units(model_dict[distributions[1]]).magnitude,
                     )
 
+                    dist1_int_units = get_internal_units(model_dict[distributions[0]])
+                    dist2_int_units = get_internal_units(model_dict[distributions[1]])
+                    if node.op in ("add", "sub"):
+                        sample_units = dist1_int_units
+                    else:
+                        sample_units = op(
+                            dist1_int_units,
+                            dist2_int_units
+                        )
+
                     if getattr(node, "trace", None):
                         numpyro.deterministic(node.name, sample)
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
-                        node.internal_units,
+                        sample_units,
                     ).to(node.units)
 
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
@@ -108,8 +118,8 @@ def graph_to_numpyro_model(g):
 
                     model_dict[node] = bellini.quantity.Quantity(
                         sample,
-                        node.internal_units,
-                    ).to(node.units)
+                        node.units,
+                    )
 
                 elif isinstance(node, bellini.distributions._JITDistribution):
                     name = node.name
