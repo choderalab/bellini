@@ -747,3 +747,59 @@ def gen_lognorm(loc, scale):
     )
     #print(ret)
     return ret
+
+class TruncatedNormal(SimpleDistribution):
+    """ Truncated Normal distribution. """
+    def __init__(self, low, loc, scale, **kwargs):
+        assert loc.dimensionality == scale.dimensionality
+        assert low.dimensionality == loc.dimensionality
+        super().__init__(low=low, loc=loc, scale=scale, **kwargs)
+
+    def unitless(self):
+        return TruncatedNormal(
+            low = to_internal_units(self.low).unitless(),
+            loc = to_internal_units(self.loc).unitless(),
+            scale = to_internal_units(self.scale).unitless()
+        )
+
+    def to_units(self, new_units, force=False):
+        try:
+            return TruncatedNormal(
+                low = self.low.to_units(new_units, force=force),
+                loc = self.loc.to_units(new_units, force=force),
+                scale = self.scale.to_units(new_units, force=force)
+            )
+        except DimensionalityError as e:
+            print(f"cannot convert {self.units} to {new_units}. if you'd like to assign new units, use force=True", file=sys.stderr)
+            raise e
+
+    @property
+    def dimensionality(self):
+        return self.loc.dimensionality
+
+    @property
+    def magnitude(self):
+        return self.loc.magnitude
+
+    @property
+    def units(self):
+        return self.loc.units
+
+    @property
+    def internal_units(self):
+        return get_internal_units(self.loc)
+
+    def __repr__(self):
+        if bellini.verbose:
+            return super().__repr__()
+        else:
+            if not isinstance(self.loc, Distribution):
+                u = f'{self.loc:~P.2f}'
+            else:
+                u = f'{self.loc}'
+            if not isinstance(self.scale, Distribution):
+                sig2 = f'{self.scale**2:~P.2f}'
+            else:
+                sig2 = f'{self.scale**2}'
+
+            return f'TruncN({u}, {sig2})[{self.units}]'
