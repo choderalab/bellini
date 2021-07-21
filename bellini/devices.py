@@ -82,12 +82,12 @@ class LiquidTransfer(ActionableDevice):
     def _noisy_volume(self, volume):
         if self.noise_model == "Normal":
             return Normal(volume, self.var)
-        elif self.noise_model == "LogNorm":
-            return gen_lognorm(volume, self.var),
+        elif self.noise_model == "LogNormal":
+            return gen_lognorm(volume, self.var)
         elif self.noise_model == "TruncatedNormal":
             return TruncatedNormal(Quantity(0, source.volume.units), volume, self.var)
         else:
-            return ValueError(f"noise model param of {self} is not valid")
+            raise ValueError(f"noise model param of {self} is not valid")
 
     def apply(self, source, sink, volume):
         # independent noise for each array element (TODO: is this valid?)
