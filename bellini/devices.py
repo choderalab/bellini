@@ -7,7 +7,7 @@ import pint
 import numpy as np
 import jax.numpy as jnp
 import bellini
-from bellini.distributions import Distribution, Normal, gen_lognorm
+from bellini.distributions import Distribution, Normal, gen_lognorm, TruncatedNormal
 from bellini.quantity import Quantity
 from bellini.containers import Container
 from bellini.units import VOLUME_UNIT
@@ -61,7 +61,8 @@ class MeasurementDevice(Device):
 
 class LiquidTransfer(ActionableDevice):
     """ Transfer an amount of liquid from one container to another with Gaussian error """
-    def __init__(self, name, var):
+    _SUPPORTED_DISTS = ["Normal", "LogNormal", "TruncatedNormal"]
+    def __init__(self, name, var, noise_model="Normal"):
         """
         TODO: allow variance to be drawn from a prior
         """
@@ -75,6 +76,18 @@ class LiquidTransfer(ActionableDevice):
 
         self.name = name
         self.dispense_count = 0
+        self.noise_model = noise_model
+        assert self.noise_model in LiquidTransfer._SUPPORTED_DISTS
+
+    def _noisy_volume(self, volume):
+        if self.noise_model == "Normal":
+            return Normal(volume, self.var)
+        elif self.noise_model == "LogNorm":
+            return gen_lognorm(volume, self.var),
+        elif self.noise_model == "TruncatedNormal":
+            return TruncatedNormal(Quantity(0, source.volume.units), volume, self.var)
+        else:
+            return ValueError(f"noise model param of {self} is not valid")
 
     def apply(self, source, sink, volume):
         # independent noise for each array element (TODO: is this valid?)
@@ -84,7 +97,7 @@ class LiquidTransfer(ActionableDevice):
             volume = volume * jnp.ones_like(source.volume.magnitude)
 
         # compute drawn volume
-        drawn_volume = gen_lognorm(volume, self.var)
+        drawn_volume = self._noisy_volume(volume)
         drawn_volume.name = f"{self.name}_{drawn_volume.name}_{self.dispense_count}"
         self.dispense_count += 1
 
@@ -132,9 +145,12 @@ class Measurer(MeasurementDevice):
 
         self.name = name
         self.measure_count = 0
+        self.units = self.var.units
 
     def readout(self, container, value, key=None):
-        measurement = Normal(container.observe(value, key=key), self.var)
+        prenoise_value = container.observe(value, key=key)
+        assert prenoise_value.dimensionality == self.units.dimensionality
+        measurement = Normal(prenoise_value, self.var)
         measurement.name = f"{self.name}_{container}_{value}_{self.measure_count}"
         self.measure_count += 1
         measurement.observed = True
