@@ -43,8 +43,8 @@ def graph_to_numpyro_model(g):
                     obs_data = None
 
                     if node in observed_nodes:
-                        if obs is not None and name in obs.keys():
-                            obs_data = obs[name].to(node.units).magnitude
+                        if obs is not None and node in obs.keys():
+                            obs_data = obs[node].to(node.units).magnitude
                         else:
                             warnings.warn(f"observed node {name} was not given data to condition on. no conditioning performed.")
 
