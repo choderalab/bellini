@@ -5,6 +5,7 @@ import numpyro
 import bellini
 import bellini.api.functional as F
 import jax.numpy as jnp
+import warnings
 from bellini.units import get_internal_units, to_internal_units, ureg
 
 # =============================================================================
@@ -18,23 +19,13 @@ def graph_to_numpyro_model(g):
     numpyro distribution to get a dimensionless quantity, then reapplying units
     when the sample is being tracked in model_dict. This is because numpyro uses
     unitless quantities when computing log probs, which leads to dimensionality
-    errors if there are mixed unitless / unit quantities. For similar reasons,
-    the final observed node and observed value must be unitless as well, but
-    units can be recovered from `model_dict` which is returned, as well as from
-    the computation graph.
-
-    TODO: is there an easy way to retain units for the observed node? It would
-    make for a more intuitive interface.
+    errors if there are mixed unitless / unit quantities.
 
     note: doesn't actually use the explicit nx graph, instead uses implicit
     param graph? need to think about design
     """
     import networkx as nx
     observed_nodes = [node for node in g.nodes if getattr(node, "observed", None)]
-
-    if len(observed_nodes) != 1:
-        raise NotImplementedError("Now we only support one observation of one node.")
-    observed_node = observed_nodes[0]
 
     def model(obs = None):
         bellini.set_infer(True)
@@ -48,12 +39,14 @@ def graph_to_numpyro_model(g):
                 model_dict[node] = node.jnp()
             else:
                 if isinstance(node, bellini.distributions.SimpleDistribution):
-                    if node is observed_node:
-                        obs_data = obs
-                    else:
-                        obs_data = None
-
                     name = node.name
+                    obs_data = None
+
+                    if node in observed_nodes:
+                        if obs is not None and name in obs.keys():
+                            obs_data = obs[name].to(node.units).magnitude
+                        else:
+                            warnings.warn(f"observed node {name} was not given data to condition on. no conditioning performed.")
 
                     parameters = {}
                     for param_name, param in node.parameters.items():
@@ -96,7 +89,6 @@ def graph_to_numpyro_model(g):
                         sample,
                         node.internal_units,
                     ).to(node.units)
-
 
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
                     name = node.name
@@ -155,9 +147,10 @@ def graph_to_numpyro_model(g):
                         node.units,
                     )
 
-        eval_node(observed_node)
+        for node in observed_nodes:
+            eval_node(node)
 
         bellini.set_infer(False)
-        return model_dict[observed_node].magnitude, model_dict
+        return model_dict
 
     return model
