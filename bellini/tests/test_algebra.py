@@ -151,7 +151,7 @@ def test_quantity_dist_arr_unitless():
         assert res.dimensionality == ureg.dimensionless.dimensionality
 
 def test_quantity_scalar_group_scalar():
-    from bellini.groups import Species, Solution
+    from bellini.groups import Species, Substance, Solvent, Solution, Mixture
     from bellini.distributions import Normal
     from bellini.quantity import Quantity as Q
     from bellini.units import ureg
@@ -159,26 +159,64 @@ def test_quantity_scalar_group_scalar():
     sugar = Species("sugar")
     salt = Species("salt")
     water = Species("water")
+
+    # check that you can multiple both ways
     one_mol_sugar = sugar * Q(1, ureg.mole)
-    one_mol_sugar = Q(1, ureg.mole) * sugar
-    one_mol_salt = salt * Q(1, ureg.mole)
-    one_mol_sugar = Q(1, ureg.mole) * salt
+    assert isinstance(one_mol_sugar, Substance)
+    one_mol_sugar_2 = Q(1, ureg.mole) * sugar
+    assert isinstance(one_mol_sugar_2, Substance)
+    assert one_mol_sugar == one_mol_sugar_2
+
     one_liter_water = water * Q(1, ureg.liter)
-    sugar_water = Solution(one_mol_sugar, one_liter_water)
+    assert isinstance(one_liter_water, Solvent)
+    one_liter_water_2 = Q(1, ureg.liter) * water
+    assert isinstance(one_liter_water, Solvent)
+    assert one_liter_water == one_liter_water_2
+
+    one_mol_salt = salt * Q(1, ureg.mole)
+    # check mixture formation from substances
     sugar_n_salt = one_mol_sugar + one_mol_salt
+    assert isinstance(sugar_n_salt, Mixture)
+    # check solution formation w/ and w/o mixtures
+    sugar_water = Solution(one_mol_sugar, one_liter_water)
     salty_sugar_water = Solution(sugar_n_salt, one_liter_water)
 
     y = Q(1)
-    z = [
+    substances = [
         one_mol_sugar * y,
         y * one_mol_sugar,
+        1 * one_mol_sugar,
+        one_mol_sugar * 1
+    ]
+    for s in substances:
+        assert s == one_mol_sugar
+
+    solvents = [
+        one_liter_water * y,
+        y * one_liter_water,
+        1 * one_liter_water,
+        one_liter_water * 1
+    ]
+    for s in solvents:
+        assert s == one_liter_water
+
+    simple_solutions = [
         y * sugar_water,
         sugar_water * y,
-        sugar_n_salt * y,
-        y * sugar_n_salt,
-        y * salty_sugar_water,
-        salty_sugar_water * y
+        1 * sugar_water,
+        sugar_water * 1
     ]
+    for s in simple_solutions:
+        assert s == sugar_water
+
+    complex_solutions = [
+        y * salty_sugar_water,
+        salty_sugar_water * y,
+        1 * salty_sugar_water,
+        salty_sugar_water * 1
+    ]
+    for s in complex_solutions:
+        assert s == salty_sugar_water
 
 def test_quantity_scalar_group_arr():
     from bellini.groups import Species, Solution
