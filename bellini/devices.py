@@ -11,6 +11,7 @@ from bellini.distributions import Distribution, Normal, gen_lognorm, TruncatedNo
 from bellini.quantity import Quantity
 from bellini.containers import Container
 from bellini.units import VOLUME_UNIT
+from bellini.reference import Reference as Ref
 
 # =============================================================================
 # BASE CLASS
@@ -107,10 +108,23 @@ class LiquidTransfer(ActionableDevice):
 
         return new_source, new_sink
 
-    def apply_state(self, experiment_state, source_name, sink_name, volume):
+    def apply_state(self, experiment_state, source_ref, sink_ref, volume):
         # retrieve source and sink containers
-        source = experiment_state[source_name]
-        sink = experiment_state[sink_name]
+        if isinstance(source_ref, Ref):
+            source_outer = experiment_state[source_ref.name]
+            source = source_ref.retrieve_index(source_outer)
+        elif isinstance(source_ref, str):
+            source = experiment_state[source_ref]
+        else:
+            raise ValueError(f"source_ref must be Reference or str, but is {source_ref}")
+
+        if isinstance(sink_ref, Ref):
+            sink_outer = experiment_state[sink_ref.name]
+            sink = sink_ref.retrieve_index(sink_outer)
+        elif isinstance(sink_ref, str):
+            sink = experiment_state[sink_ref]
+        else:
+            raise ValueError(f"sink_ref must be Reference or str, but is {sink_ref}")
         assert isinstance(source, Container)
         assert isinstance(sink, Container)
 
@@ -119,8 +133,14 @@ class LiquidTransfer(ActionableDevice):
 
         # aliquot and create new experiment state
         new_experiment_state = experiment_state.copy()
-        new_experiment_state[source_name] = new_source
-        new_experiment_state[sink_name] = new_sink
+        if isinstance(source_ref, Ref):
+            source_ref.set_index(new_experiment_state[source_ref.name], new_source, copy=False)
+        else:
+            new_experiment_state[source_ref] = new_source
+        if isinstance(sink_ref, Ref):
+            sink_ref.set_index(new_experiment_state[sink_ref.name], new_sink, copy=False)
+        else:
+            new_experiment_state[sink_ref] = new_sink
 
         # generate belief graph
         belief_graph = {
@@ -156,7 +176,13 @@ class Measurer(MeasurementDevice):
         measurement.observed = True
         return measurement
 
-    def readout_state(self, experiment_state, container_name, value, key=None):
-        container = experiment_state[container_name]
+    def readout_state(self, experiment_state, container_ref, value, key=None):
+        if isinstance(container_ref, Ref):
+            container_outer = experiment_state[container_ref.name]
+            container = container_ref.retrieve_index(container_outer)
+        elif isinstance(container_ref, str):
+            container = experiment_state[container_ref]
+        else:
+            raise ValueError(f"container_ref must be Reference or str, but is {container_ref}")
         measurement = self.readout(container, value, key)
         return {(value, key): measurement} if key else {value: measurement}

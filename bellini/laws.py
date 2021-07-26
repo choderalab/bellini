@@ -2,6 +2,7 @@ import bellini
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution, _JITDistribution
 import numpy as np
+from bellini.reference import Reference as Ref
 
 class Law(object):
     def __init__(self, fn, input_mapping, output_labels=None, name=None, params=None):
@@ -54,6 +55,10 @@ class Law(object):
                 if key in dict_attr.keys():
                     inputs[kwarg] = dict_attr[key]
                     continue
+            elif isinstance(inpt, Ref):
+                attr = getattr(group, inpt.name)
+                inputs[kwarg] = inpt.retrieve_index(attr)
+                continue
             else:
                 if hasattr(group, inpt):
                     inputs[kwarg] = getattr(group, inpt)
