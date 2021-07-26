@@ -6,6 +6,7 @@ from bellini.units import VOLUME_UNIT
 from bellini.quantity import Quantity
 from bellini.api import utils
 from bellini.groups import Liquid
+from bellini.reference import Reference as Ref
 
 # =============================================================================
 # Containers
@@ -74,10 +75,14 @@ class Container(object):
         return f"Well containing {self.solution}"
 
     def observe(self, value, key=None):
-        if key:
-            return getattr(self.solution, value)[key]
+        if isinstance(value, Ref):
+            attr = getattr(self.solution, value.name)
+            return value.retrieve_index(attr)
         else:
-            return getattr(self.solution, value)
+            if key:
+                return getattr(self.solution, value)[key]
+            else:
+                return getattr(self.solution, value)
 
     def __hash__(self):
         return hash(id(self))

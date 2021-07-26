@@ -24,7 +24,7 @@ class Reference(object):
             item = item[s]
         return item
 
-    def set_index(self, item, value, copy=True):
+    def set_index(self, item, value, copy=False):
         if copy:
             item = item.copy()
         # in order to ensure we change the data structure and not just the pointer
@@ -35,6 +35,11 @@ class Reference(object):
         item[self.slices[-1]] = value
         return item
 
-    def hash(self):
-        assert len(self.slices) == 0, f"{self} was asked to be hashed, but we should never be hashing sliced References"
-        return hash(self.__class__) + hash(self.name)
+    def is_base(self):
+        return len(self.slices) == 0
+
+    def __hash__(self):
+        return hash(self.__class__) + hash(self.name) + hash(self.slices)
+
+    def __eq__(self, other):
+        return (self.name == other.name) and (self.slices == other.slices)

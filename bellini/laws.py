@@ -28,6 +28,10 @@ class Law(object):
             computation using an accelerated framework e.g. jax, torch
         """
         self.input_mapping = input_mapping
+        if output_labels:
+            assert np.array([
+                isinstance(label, Ref) for label in output_labels
+            ]).all(), "all output_labels must be Reference objects"
         self.output_labels = output_labels
         self.fn = fn
         self.params = params
@@ -90,20 +94,27 @@ class Law(object):
             for key, arg in inputs.items():
                 deterministic_args[key] = to_quantity(arg)
 
-            outputs = self.fn(**deterministic_args)
+            outputs = {}
+            deterministic_outputs = self.fn(**deterministic_args)
             for label in self.output_labels:
                 outputs[label] = _JITDistribution(
                     self.fn,
                     inputs,
                     label,
-                    deterministic_outputs=outputs
+                    deterministic_outputs=deterministic_outputs
                 )
         else:
             outputs = self.fn(**inputs)
 
         # create new group with law applied
         new_group = bellini.LawedGroup(group, self)
-        for attr, value in outputs.items():
-            setattr(new_group, attr, value)
+        for ref, value in outputs.items():
+            name = ref.name
+            if hasattr(new_group, name):
+                item = getattr(new_group, name)
+                ref.set_index(item, value)
+            else:
+                assert ref.is_base(), "can't subindex something that doesn't exist!"
+                setattr(new_group, ref, value)
 
         return new_group
