@@ -73,12 +73,30 @@ class Law(object):
         ])
         if is_dist.any():
             assert self.output_labels is not None
-            outputs = {}
+            # compute deterministic outputs on the outside
+            # so we can reduce computation by only running `fn` once
+            def to_quantity(arg):
+                if isinstance(arg, bellini.Quantity):
+                    return arg
+                else:
+                    if isinstance(arg, (list, tuple)):
+                        return [to_quantity(r) for r in arg]
+                    elif isinstance(arg, dict):
+                        return {key: to_quantity(value) for key, value in arg.items()}
+                    else:
+                        return bellini.Quantity(arg.magnitude, arg.units)
+
+            deterministic_args = {}
+            for key, arg in inputs.items():
+                deterministic_args[key] = to_quantity(arg)
+
+            outputs = self.fn(**deterministic_args)
             for label in self.output_labels:
                 outputs[label] = _JITDistribution(
                     self.fn,
                     inputs,
-                    label
+                    label,
+                    deterministic_outputs=outputs
                 )
         else:
             outputs = self.fn(**inputs)

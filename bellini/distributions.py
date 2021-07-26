@@ -382,31 +382,40 @@ class TransformedDistribution(Distribution):
 # TODO: i need a better name for this
 class _JITDistribution(Distribution):
     """ A wrapper for functions of random variables with multiple outputs """
-    def __init__(self, fn, inputs, label):
+    def __init__(self, fn, inputs, label, deterministic_outputs=None):
         super().__init__()
         self.fn = fn
         self.inputs = inputs
         self.label = label
 
-        def to_quantity(arg):
-            if isinstance(arg, bellini.Quantity):
-                return arg
-            else:
-                if isinstance(arg, (list, tuple)):
-                    return [to_quantity(r) for r in arg]
-                elif isinstance(arg, dict):
-                    return {key: to_quantity(value) for key, value in arg.items()}
+        # hacky bypass that allows us to rely on outside computation
+        # to only compute the function once
+        # TODO: think of cleaner way of doing this?
+        outputs = deterministic_outputs
+        if outputs:
+            self._magnitude = outputs[label].magnitude
+            self._units = outputs[label].units
+            self._internal_units = get_internal_units(outputs[label])
+        else:
+            def to_quantity(arg):
+                if isinstance(arg, bellini.Quantity):
+                    return arg
                 else:
-                    return bellini.Quantity(arg.magnitude, arg.units)
+                    if isinstance(arg, (list, tuple)):
+                        return [to_quantity(r) for r in arg]
+                    elif isinstance(arg, dict):
+                        return {key: to_quantity(value) for key, value in arg.items()}
+                    else:
+                        return bellini.Quantity(arg.magnitude, arg.units)
 
-        deterministic_args = {}
-        for key, arg in self.inputs.items():
-            deterministic_args[key] = to_quantity(arg)
+            deterministic_args = {}
+            for key, arg in self.inputs.items():
+                deterministic_args[key] = to_quantity(arg)
 
-        outputs = self.fn(**deterministic_args)
-        self._magnitude = outputs[label].magnitude
-        self._units = outputs[label].units
-        self._internal_units = get_internal_units(outputs[label])
+            outputs = self.fn(**deterministic_args)
+            self._magnitude = outputs[label].magnitude
+            self._units = outputs[label].units
+            self._internal_units = get_internal_units(outputs[label])
 
     @property
     def dimensionality(self):

@@ -29,7 +29,8 @@ def graph_to_numpyro_model(g):
 
     def model(obs = None):
         bellini.set_infer(True)
-        model_dict = {}
+        model_dict = {} # serves as model trace as well as DP lookup table
+        _jit_dist_cache = {} # serves as _jit_dist output cache
 
         def eval_node(node):
             """ Evaluate node values recursively using DP """
@@ -38,6 +39,7 @@ def graph_to_numpyro_model(g):
             elif isinstance(node, bellini.quantity.Quantity):
                 model_dict[node] = node.jnp()
             else:
+                # draw directly from numpyro function for simple distribution
                 if isinstance(node, bellini.distributions.SimpleDistribution):
                     name = node.name
                     obs_data = None
@@ -69,6 +71,7 @@ def graph_to_numpyro_model(g):
                         node.units,
                     )
 
+                # compute composed distribution based on parameters
                 elif isinstance(node, bellini.distributions.ComposedDistribution):
                     name = node.name
                     op = getattr(F, node.op)
@@ -100,6 +103,7 @@ def graph_to_numpyro_model(g):
                         sample_units,
                     ).to(node.units)
 
+                # compute transposed distribution based on parameters
                 elif isinstance(node, bellini.distributions.TransformedDistribution):
                     name = node.name
                     op = getattr(jnp, node.op)
@@ -121,6 +125,7 @@ def graph_to_numpyro_model(g):
                         node.units,
                     )
 
+                # compute fn outputs based on parameters, with caching
                 elif isinstance(node, bellini.distributions._JITDistribution):
                     name = node.name
                     fn = node.fn
@@ -130,18 +135,24 @@ def graph_to_numpyro_model(g):
                     for arg in inputs.values():
                         eval_node(arg)
 
-                    sampled_inputs = {
-                        key: model_dict[arg]
-                        for key, arg in inputs.items()
-                    }
+                    # caching fn outputs since fn could potentially be expensive
+                    _cache_key = (fn, ((k,v) for k,v in inputs.items()))
+                    if _cache_key not in _jit_dist_cache.keys():
+                        sampled_inputs = {
+                            key: model_dict[arg]
+                            for key, arg in inputs.items()
+                        }
 
-                    sample = fn(**sampled_inputs)[label]
+                        _jit_dist_cache[_cache_key] = fn(**sampled_inputs)
+
+                    sample = _jit_dist_cache[_cache_key][label]
 
                     if getattr(node, "trace", None):
                         numpyro.deterministic(node.name, sample.magnitude)
 
                     model_dict[node] = sample.to(node.units)
 
+                # compute unit scaling
                 elif isinstance(node, bellini.distributions.UnitChangedDistribution):
                     name = node.name
                     dist = node.distribution
