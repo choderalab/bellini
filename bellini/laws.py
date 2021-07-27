@@ -115,6 +115,6 @@ class Law(object):
                 ref.set_index(item, value)
             else:
                 assert ref.is_base(), "can't subindex something that doesn't exist!"
-                setattr(new_group, ref, value)
+                setattr(new_group, ref.name, value)
 
         return new_group
