@@ -5,7 +5,7 @@ import numpy as np
 from bellini.reference import Reference as Ref
 
 class Law(object):
-    def __init__(self, fn, input_mapping, output_labels=None, name=None, params=None):
+    def __init__(self, law_fn, input_mapping, output_labels=None, name=None, params=None, group_create_fn=None):
         """
         An object that applies some physical law on a group, grabbing inputs
         dictated by `input_mapping`, applying `fn`, and returning a new instance
@@ -13,9 +13,9 @@ class Law(object):
 
         Parameters:
         ----------
-        fn: func - a function that takes kwarg inputs based on
+        law_fn: Python callable - a function that takes kwarg inputs based on
             `input_mapping`'s labels and returns a dict storing law outputs. the
-            dict should have labels (str) corresponding to the attribute the
+            dict should have labels (`bellini.Reference`) corresponding to the attribute the
             result will be stored in when the law is applied to an object, and
             values of those resulting outputs. `fn` should expected Quantity inputs
             and must also return Quantity outputs.
@@ -26,6 +26,12 @@ class Law(object):
             `fn` is written purely using bellini.api.functional calls, which keeps track of
             transformations automatically, but is required if you perform
             computation using an accelerated framework e.g. jax, torch
+        params (optional): dict - parameters of law_fn that do not rely on inputs
+        group_create_fn (optional): Python callable - a function that takes
+            law_fn's outputs and the original `Group` and returns a new `Group`.
+            If not provided, the returned `Group` after applying a law will just
+            be a copy of the original group, with new attributes set according
+            to the output of law_fn and/or output_labels
         """
         self.input_mapping = input_mapping
         if output_labels:
@@ -33,13 +39,14 @@ class Law(object):
                 isinstance(label, Ref) for label in output_labels
             ]).all(), "all output_labels must be Reference objects"
         self.output_labels = output_labels
-        self.fn = fn
+        self.law_fn = law_fn
+        self.group_create_fn = group_create_fn
         self.params = params
 
         if name:
             self.name = name
         else:
-            name = f"Law with input mapping {self.input_mapping}, function {fn}, and params {params}"
+            name = f"Law with input mapping {self.input_mapping}, function {law_fn}, and params {params}"
 
     def __repr__(self):
         return self.name
@@ -95,26 +102,29 @@ class Law(object):
                 deterministic_args[key] = to_quantity(arg)
 
             outputs = {}
-            deterministic_outputs = self.fn(**deterministic_args)
+            deterministic_outputs = self.law_fn(**deterministic_args)
             for label in self.output_labels:
                 outputs[label] = _JITDistribution(
-                    self.fn,
+                    self.law_fn,
                     inputs,
                     label,
                     deterministic_outputs=deterministic_outputs
                 )
         else:
-            outputs = self.fn(**inputs)
+            outputs = self.law_fn(**inputs)
 
         # create new group with law applied
-        new_group = bellini.LawedGroup(group, self)
-        for ref, value in outputs.items():
-            name = ref.name
-            if hasattr(new_group, name):
-                item = getattr(new_group, name)
-                ref.set_index(item, value)
-            else:
-                assert ref.is_base(), "can't subindex something that doesn't exist!"
-                setattr(new_group, ref.name, value)
+        if self.group_create_fn:
+            new_group = self.group_create_fn(outputs, group)
+        else: # default behavior
+            new_group = bellini.LawedGroup(group, self)
+            for ref, value in outputs.items():
+                name = ref.name
+                if hasattr(new_group, name):
+                    item = getattr(new_group, name)
+                    ref.set_index(item, value)
+                else:
+                    assert ref.is_base(), "can't subindex something that doesn't exist!"
+                    setattr(new_group, ref.name, value)
 
         return new_group
