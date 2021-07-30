@@ -472,7 +472,7 @@ class Solution(Liquid):
         )
 
         if 'concentrations' not in values.keys():
-            values['concentrations'] = {
+            self._concentrations = {
                 substance.species: substance.moles/solvent.volume
                 for substance in mixture.substances
             }
@@ -482,6 +482,7 @@ class Solution(Liquid):
             solvent=solvent,
             **values
         )
+
 
     def copy(self):
         return Solution(
@@ -500,6 +501,15 @@ class Solution(Liquid):
     def concentration(self):
         assert len(self.concentrations) == 1, f"{self} complex solution, use `self.concentrations` instead"
         return list(self.concentrations.values())[0]
+
+    @property
+    def concentrations(self):
+        if not hasattr(self, "_concentrations"):
+            self._concentrations = {
+                substance.species: substance.moles/self.solvent.volume
+                for substance in self.mixture.substances
+            }
+        return self._concentrations
 
     def __repr__(self):
         return " and ".join([
