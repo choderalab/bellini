@@ -10,6 +10,7 @@ import numpy as np
 import warnings
 from pint.errors import DimensionalityError
 
+
 # =============================================================================
 # BASE CLASSES
 # =============================================================================
@@ -171,6 +172,18 @@ class Distribution(abc.ABC):
             name=self.name,
             **parameters)
         return instance
+
+    def __lt__(self, x):
+        warnings.warn(("We only allow comparisons so that numpyro can sort "
+                       "keys during inference. You otherwise really shouldn't be"
+                       "using __lt__"))
+        return hash(self) < hash(x)
+
+    def __gt__(self, x):
+        warnings.warn(("We only allow comparisons so that numpyro can sort "
+                       "keys during inference. You otherwise really shouldn't be"
+                       "using __gt__"))
+        return hash(self) > hash(x)
 
 
 class SimpleDistribution(Distribution):
@@ -452,17 +465,32 @@ class _JITDistribution(Distribution):
             ntype="_jit_distribution",
         )
         for key, arg in self.inputs.items():
-            g.add_node(
-                arg,
-                ntype="arg",
-                key=key
-            )
-            g.add_edge(
-                arg,
-                self,
-                etype="is_arg_of"
-            )
-            g = nx.compose(g, arg.g)
+            if isinstance(arg, dict): # so we can hash dict-like args
+                arg = tuple(arg.keys())
+                for a in arg:
+                    g.add_node(
+                        a,
+                        ntype="arg",
+                        key=key
+                    )
+                    g.add_edge(
+                        a,
+                        self,
+                        etype="is_arg_of"
+                    )
+                    g = nx.compose(g, a.g)
+            else:
+                g.add_node(
+                    arg,
+                    ntype="arg",
+                    key=key
+                )
+                g.add_edge(
+                    arg,
+                    self,
+                    etype="is_arg_of"
+                )
+                g = nx.compose(g, arg.g)
         self._g = g
         return g
 
@@ -592,11 +620,13 @@ class Normal(SimpleDistribution):
             return super().__repr__()
         else:
             if not isinstance(self.loc, Distribution):
-                u = f'{self.loc:~P.2f}'
+                #u = f'{self.loc:~P.2f}'
+                u = f'{self.loc}'
             else:
                 u = f'{self.loc}'
             if not isinstance(self.scale, Distribution):
-                sig2 = f'{self.scale**2:~P.2f}'
+                #sig2 = f'{self.scale**2:~P.2f}'
+                sig2 = f'{self.scale**2}'
             else:
                 sig2 = f'{self.scale**2}'
 
@@ -646,11 +676,13 @@ class Uniform(SimpleDistribution):
             return super().__repr__()
         else:
             if not isinstance(self.low, Distribution):
-                low = f'{self.low:~P.2f}'
+                #low = f'{self.low:~P.2f}'
+                low = f'{self.low}'
             else:
                 low = f'{self.low}'
             if not isinstance(self.high, Distribution):
-                high = f'{self.high:~P.2f}'
+                #high = f'{self.high:~P.2f}'
+                high = f'{self.high}'
             else:
                 high = f'{self.high}'
 
@@ -700,20 +732,21 @@ class LogNormal(SimpleDistribution):
             return super().__repr__()
         else:
             if not isinstance(self.loc, Distribution):
-                u = f'{self.loc:~P.3e}'
+                #u = f'{self.loc:~P.3e}'
+                u = f'{self.loc}'
             else:
                 u = f'{self.loc}'
             if not isinstance(self.scale, Distribution):
-                sig = f'{self.scale:.3e~P}'
+                #sig = f'{self.scale:.3e~P}'
+                sig = f'{self.scale}'
             else:
                 sig = f'{self.scale}'
 
             return f'LogNorm({u}, {sig})[{self.units}]'
 
-
 def gen_lognorm(loc, scale):
+    """ Generate a LogNormal that is centered at `loc` with scale `scale` """
     assert loc.dimensionality == scale.dimensionality
-    #print("enter lognorm", loc, scale)
     loc_units, scale_units = loc.units, scale.units
 
     if isinstance(loc, (bellini.Quantity, bellini.Distribution)):
@@ -725,36 +758,24 @@ def gen_lognorm(loc, scale):
     sig = F.log(1 + scale ** 2 / loc ** 2)
 
     if isinstance(u, bellini.Quantity):
-        #print("u is quant")
         if u.dimensionality == ureg.dimensionless.dimensionality:
             u = u.to_units(loc_units, force=True)
     elif isinstance(u, bellini.Distribution):
-        #print("u is dist", u)
         u = u.to_units(loc_units, force=True)
-    else:
-        #print("u is scalar")
-        #print("gen_lognorm", u)
         u = bellini.Quantity(u, loc_units)
 
     if isinstance(sig, bellini.Quantity):
         if sig.dimensionality == ureg.dimensionless.dimensionality:
             sig = sig.to_units(loc_units, force=True)
-        #print("sig is quant")
     elif isinstance(sig, bellini.Distribution):
-        #print("sig is dist", sig)
         sig = sig.to_units(scale_units, force=True)
     else:
-        #print("sig is scalar")
-        #print("gen_lognorm", u)
         sig = bellini.Quantity(scale, scale_units)
-
-    #print(u, sig)
 
     ret = LogNormal(
         loc=u,
         scale=sig
     )
-    #print(ret)
     return ret
 
 class TruncatedNormal(SimpleDistribution):
@@ -803,11 +824,13 @@ class TruncatedNormal(SimpleDistribution):
             return super().__repr__()
         else:
             if not isinstance(self.loc, Distribution):
-                u = f'{self.loc:~P.2f}'
+                #u = f'{self.loc:~P.2f}'
+                u = f'{self.loc}'
             else:
                 u = f'{self.loc}'
             if not isinstance(self.scale, Distribution):
-                sig2 = f'{self.scale**2:~P.2f}'
+                #sig2 = f'{self.scale**2:~P.2f}'
+                sig2 = f'{self.scale**2}'
             else:
                 sig2 = f'{self.scale**2}'
 
