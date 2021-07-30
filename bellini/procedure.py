@@ -4,6 +4,7 @@
 import abc
 import bellini
 from bellini import Quantity, Distribution, Group
+from bellini.containers import Container
 from bellini.devices import Device, ActionableDevice, MeasurementDevice
 from collections import OrderedDict
 
@@ -12,7 +13,7 @@ from collections import OrderedDict
 # =============================================================================
 def _is_exp_obj(x):
     return isinstance(x, (
-        Group, Distribution, Quantity
+        Group, Distribution, Quantity, Container
     ))
 
 class Procedure(abc.ABC):
@@ -39,7 +40,7 @@ class Procedure(abc.ABC):
         self.belief_subgraphs = []
 
     def register(self, name, x):
-        if isinstance(x, device):
+        if isinstance(x, Device):
             self.devices[name] = x
         elif _is_exp_obj(x):
             self.exp_state[name] = x
