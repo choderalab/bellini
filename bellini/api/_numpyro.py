@@ -12,7 +12,7 @@ from bellini.units import get_internal_units, to_internal_units, ureg
 # Compilation
 # =============================================================================
 
-def graph_to_numpyro_model(g):
+def graphs_to_numpyro_model(graph_list):
     """ Convert a belief graph to a `numpyro` model.
 
     The current design involves removing units from parameters, sampling from a
@@ -25,7 +25,8 @@ def graph_to_numpyro_model(g):
     param graph? need to think about design
     """
     import networkx as nx
-    observed_nodes = [node for node in g.nodes if getattr(node, "observed", None)]
+    G = nx.compose_all(graph_list)
+    observed_nodes = [node for node in G.nodes if getattr(node, "observed", None)]
 
     def model(obs = None):
         bellini.set_infer(True)
