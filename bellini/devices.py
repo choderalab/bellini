@@ -62,7 +62,7 @@ class MeasurementDevice(Device):
 
 class LiquidTransfer(ActionableDevice):
     """ Transfer an amount of liquid from one container to another with Gaussian error """
-    _SUPPORTED_DISTS = ["Normal", "LogNormal", "TruncatedNormal"]
+    _SUPPORTED_DISTS = ["Normal", "LogNormal", "TruncatedNormal", None]
     def __init__(self, name, var, noise_model="Normal"):
         """
         TODO: allow variance to be drawn from a prior
@@ -86,7 +86,9 @@ class LiquidTransfer(ActionableDevice):
         elif self.noise_model == "LogNormal":
             return gen_lognorm(volume, self.var)
         elif self.noise_model == "TruncatedNormal":
-            return TruncatedNormal(Quantity(0, source.volume.units), volume, self.var)
+            return TruncatedNormal(Quantity(0, self.var.units), volume, self.var)
+        elif self.noise_model is None:
+            return volume
         else:
             raise ValueError(f"noise model param of {self} is not valid")
 
