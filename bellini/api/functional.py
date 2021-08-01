@@ -95,11 +95,12 @@ def _fn_wrapper(fn):
 
     return _wrapped_fn
 
-def __getattribute__(name):
-    # when getting special attributes, return the actual module's attr
-    # instead of a function
-    if name[:2] == '__' and name[-2:] == '__':
-        return __getattr__(name)
+def __getattr__(name):
+    # TODO: fix this hacky fix that lets both autodoc and pytest to work
+    if name == "__path__":
+        return [globals()["__file__"]]
+    elif name == "__all__":
+        return []
     elif name in OPS.keys():
         return OPS[name]
     else:
