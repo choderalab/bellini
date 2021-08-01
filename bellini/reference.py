@@ -20,11 +20,14 @@ class Reference(object):
         ])
 
     def retrieve_index(self, item):
+        """ Given `item`, return it subindexed according to `item.slices` """
         for s in self.slices:
             item = item[s]
         return item
 
     def set_index(self, item, value, copy=False):
+        """ Given `item`, assign `value` to `item` subindexed
+        according to `item.slices` """
         if copy:
             item = item.copy()
         # in order to ensure we change the data structure and not just the pointer
@@ -36,6 +39,7 @@ class Reference(object):
         return item
 
     def is_base(self):
+        """ Returns whether or not the current Reference contains subindexes """
         return len(self.slices) == 0
 
     def __hash__(self):

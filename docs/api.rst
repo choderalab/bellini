@@ -3,5 +3,16 @@ API Documentation
 
 .. autosummary::
    :toctree: autosummary
+   :template: custom-module-template.rst
+   :recursive:
 
-   bellini.canvas
+   bellini.api
+   bellini.containers
+   bellini.devices
+   bellini.distributions
+   bellini.groups
+   bellini.laws
+   bellini.procedure
+   bellini.quantity
+   bellini.reference
+   bellini.units

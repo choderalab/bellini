@@ -26,14 +26,17 @@ class Distribution(abc.ABC):
 
     @abc.abstractmethod
     def unitless(self):
+        """ Return a unitless version of self """
         raise NotImplementedError()
 
     @abc.abstractmethod
     def to_units(self, new_units, force=False):
+        """ Return self converted to units `new_units` """
         raise NotImplementedError()
 
     @property
     def name(self):
+        """ A string representing the name of self """
         if self._name is not None:
             return self._name
         else:
@@ -72,6 +75,8 @@ class Distribution(abc.ABC):
 
     @property
     def g(self):
+        """ A networkx graph describing the computation graph used to create
+        this Distribution """
         if not hasattr(self, '_g'):
             self._build_graph()
         return self._g
@@ -91,22 +96,29 @@ class Distribution(abc.ABC):
 
     @abc.abstractproperty
     def dimensionality(self):
+        """ The Distribution's dimensionality (e.g. 'length' for meter) """
         raise NotImplementedError
 
     @abc.abstractproperty
     def magnitude(self):
+        """ A quantity (array-like or scalar) with the same shape as expected samples
+        from this Distribution """
         raise NotImplementedError
 
     @abc.abstractproperty
     def units(self):
+        """ The units of this Distribution (e.g. molar) """
         raise NotImplementedError
 
     @abc.abstractproperty
     def internal_units(self):
+        """ The units associated with internal computations in Bellini for this
+        Distribution """
         raise NotImplementedError
 
     @property
     def shape(self):
+        """ The shape of samples from this Distribution """
         return self.magnitude.shape
 
     def __add__(self, x):
@@ -187,6 +199,8 @@ class Distribution(abc.ABC):
 
 
 class SimpleDistribution(Distribution):
+    """ Base class for all distributions that can be directly sampled from
+    in any Bellini backend"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -509,6 +523,7 @@ class _JITDistribution(Distribution):
 
 
 class UnitChangedDistribution(Distribution):
+    """ A distribution whose units have been changed """
     def __init__(self, distribution, new_units, force=False):
         assert not isinstance(distribution, UnitChangedDistribution), "can't have nested UnitChangedDistributions"
         self.distribution = distribution

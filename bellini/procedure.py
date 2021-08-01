@@ -40,6 +40,8 @@ class Procedure(abc.ABC):
         self.belief_subgraphs = []
 
     def register(self, name, x):
+        """ Add a new experimental object or device `x` to the Procedure,
+        with reference name `name`"""
         if isinstance(x, Device):
             self.devices[name] = x
         elif _is_exp_obj(x):
@@ -48,7 +50,8 @@ class Procedure(abc.ABC):
             raise ValueError("only experimental objects and devices can be registered")
 
     def perform(self, actionable_name, **arg_names):
-        """
+        """ Use ActionableDevice `actionable_name` to manipuate the current
+        experimental state according to the device's `apply_state` function.
         `arg_names` should correspond to the device's `apply_state()` signature
         """
         # apply device to state to get new state
@@ -64,8 +67,9 @@ class Procedure(abc.ABC):
         return len(self.timeline)-1
 
     def measure(self, measurement_name, **arg_names):
-        """
-        `arg_names` should correspond to the device's `apply_state()` signature
+        """ Use MeasurementDevice `measurement_name` to readout a measurement from
+        the experimental state according to the device's `readout_state` function.
+        `arg_names` should correspond to the device's `readout_state()` signature
         """
         device = self.devices[measurement_name]
         assert isinstance(device, MeasurementDevice), f"cannot use `measure` with {device}"
@@ -73,6 +77,7 @@ class Procedure(abc.ABC):
         return results
 
     def apply_law(self, law, container_name):
+        """ Apply law `law` to container `container_name` """
         # get container and apply law
         container = self.exp_state[container_name]
         lawed_container = container.apply_law(law)
@@ -137,6 +142,9 @@ class Procedure(abc.ABC):
 
     @property
     def g(self):
+        """ Return an networkx graph representing how experimental states
+        change over time. Meant to be graphed with `nx.multipartite` using key
+        `layer`."""
         if not hasattr(self, '_g'):
             self._build_graph()
         return self._g

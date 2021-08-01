@@ -1,3 +1,12 @@
+""" Groups are objects that represent experimental reagents, e.g. compounds,
+buffers, solvents, etc.
+
+The key thing to remember is that Groups are not immutable e.g. any operation
+using groups will produce new Groups rather than modifying existing Groups'
+parameters.
+"""
+
+
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -24,10 +33,12 @@ class Group(abc.ABC):
 
     @abc.abstractmethod
     def copy(self):
+        """ Return a copy of itself """
         raise NotImplementedError()
 
     @property
     def name(self):
+        """ A string used to represent the Group """
         if self._name is not None:
             return self._name
         else:
@@ -74,6 +85,7 @@ class Group(abc.ABC):
 
     @property
     def g(self):
+        """ A networkx graph representing how the group was constructed """
         if not hasattr(self, "_g"):
             self._build_graph()
 
@@ -115,6 +127,7 @@ class Group(abc.ABC):
 # observation model
 
 class LawedGroup(Group):
+    """ Class constructed by default for a Group after a Law has been applied to it """
     def __new__(cls, group, law):
         assert isinstance(group, Group)
         assert isinstance(law, Law)
@@ -152,6 +165,7 @@ class LawedGroup(Group):
 # =============================================================================
 
 class Chemical(Group):
+    """ Base class for all chemical-like Groups """
     @abc.abstractmethod
     def __add__(self, x):
         raise NotImplementedError
@@ -276,8 +290,23 @@ class Substance(Chemical):
 
 
 class Liquid(Chemical):
+    """ Base class for all liquid-like Chemicals """
     @abc.abstractmethod
     def aliquot(self, volume):
+        """ Return an aliquot of itself, as well as the remaining source solution
+
+        Parameters
+        ----------
+        volume : Quantity (volume)
+            The amount of liquid to aliquot out of the current solution
+
+        Returns
+        -------
+        aliquot: Liquid
+            The aliquot drawn from the initial solution
+        source: Liquid
+            The remaining solution after the aliquot has been removed
+        """
         raise NotImplementedError()
 
 class Solvent(Liquid):
@@ -337,7 +366,20 @@ class Solvent(Liquid):
         return hash(self.volume) + hash(self.species)
 
     def aliquot(self, volume):
-        """ Split into aliquot and source """
+        """ Return an aliquot of itself, as well as the remaining source solution
+
+        Parameters
+        ----------
+        volume : Quantity (volume)
+            The amount of liquid to aliquot out of the current solution
+
+        Returns
+        -------
+        aliquot: Solvent
+            The aliquot drawn from the initial solution
+        source: Solvent
+            The remaining solution after the aliquot has been removed
+        """
         #assert volume.units == VOLUME_UNIT
 
         aliquot = Solvent(
@@ -457,6 +499,7 @@ class Mixture(Chemical):
         return Mixture(substances=substances)
 
 class Solution(Liquid):
+    """ A substance or a mixture dissolved in a solvent """
     def __init__(self, mixture, solvent, **values):
         # check the type of substance and solvent
         if isinstance(mixture, Substance):
@@ -491,19 +534,23 @@ class Solution(Liquid):
 
     @property
     def moles(self):
+        """ The number of moles of each substance in the solution """
         return [substance.moles for substance in self.mixture.substances]
 
     @property
     def volume(self):
+        """ The volume of the solution """
         return self.solvent.volume
 
     @property
     def concentration(self):
+        """ The concentration of the solution, if there is only one solute dissolved """
         assert len(self.concentrations) == 1, f"{self} complex solution, use `self.concentrations` instead"
         return list(self.concentrations.values())[0]
 
     @property
     def concentrations(self):
+        """ The concentrations of all solutes dissolved """
         if not hasattr(self, "_concentrations"):
             self._concentrations = {
                 substance.species: substance.moles/self.solvent.volume
@@ -551,7 +598,20 @@ class Solution(Liquid):
         )
 
     def aliquot(self, volume):
-        """ Split into aliquot and source """
+        """ Return an aliquot of itself, as well as the remaining source solution
+
+        Parameters
+        ----------
+        volume : Quantity (volume)
+            The amount of liquid to aliquot out of the current solution
+
+        Returns
+        -------
+        aliquot: Solution
+            The aliquot drawn from the initial solution
+        source: Solution
+            The remaining solution after the aliquot has been removed
+        """
         #assert volume.units == VOLUME_UNIT
 
         new_volume = self.volume - volume

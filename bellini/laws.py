@@ -1,3 +1,6 @@
+""" Module containing objects that model physical laws """
+
+
 import bellini
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution, _JITDistribution
@@ -5,34 +8,44 @@ import numpy as np
 from bellini.reference import Reference as Ref
 
 class Law(object):
+    """ An object that applies some physical law on a group, grabbing inputs
+    dictated by `input_mapping`, applying `law_fn`, and returning a new instance
+    with the law applied. """
     def __init__(self, law_fn, input_mapping, output_labels=None, name=None, params=None, group_create_fn=None):
         """
-        An object that applies some physical law on a group, grabbing inputs
-        dictated by `input_mapping`, applying `fn`, and returning a new instance
-        with the law applied.
-
-        Parameters:
+        Parameters
         ----------
-        law_fn: Python callable - a function that takes kwarg inputs based on
+        
+        law_fn : Python callable
+            a function that takes kwarg inputs based on
             `input_mapping`'s labels and returns a dict storing law outputs. the
             dict should have labels (`bellini.Reference`) corresponding to the attribute the
             result will be stored in when the law is applied to an object, and
             values of those resulting outputs. `fn` should expected Quantity inputs
             and must also return Quantity outputs.
-        input_mapping: dict - a dict mapping `fn` kwarg labels (str) to attributes
-            names (str), which will be used to retrieve inputs from the given group
-        output_labels: list - output labels of `fn`, which are used to connect
+
+        input_mapping : dict
+            a dict mapping `law_fn` kwarg labels (str) to attributes names (str),
+            which will be used to retrieve inputs from the given group
+
+        output_labels : list
+            output labels of `law_fn`, which are used to connect
             inputs and outputs during compilation. this is not necessary if
-            `fn` is written purely using bellini.api.functional calls, which keeps track of
-            transformations automatically, but is required if you perform
-            computation using an accelerated framework e.g. jax, torch
-        params (optional): dict - parameters of law_fn that do not rely on inputs
-        group_create_fn (optional): Python callable - a function that takes
+            `law_fn` is written purely using `bellini.api.functional calls`,
+            which keeps track of transformations automatically, but is required
+            if you perform computation using an accelerated framework e.g. jax, torch
+
+        params : dict, optional
+            parameters of law_fn that do not rely on inputs
+
+        group_create_fn : Python callable, optional
+            a function that takes
             law_fn's outputs and the original `Group` and returns a new `Group`.
             If not provided, the returned `Group` after applying a law will just
             be a copy of the original group, with new attributes set according
             to the output of law_fn and/or output_labels
         """
+
         self.input_mapping = input_mapping
         if output_labels:
             assert np.array([

@@ -1,3 +1,28 @@
+""" A high-level interface that provides a backend-agnostic numpy-like API when
+performing computations on Quantities and Distributions
+
+bellini.api.functional serves as a wrapper for backend tensor-accelerated framework
+operations. It doesn't actually contain any functions itself, and instead
+wraps whatever function you query from it in a way that you can apply it to
+things like Quantities or Distributions. Hence, you should import the module
+instead of attempting to import functions directly from it. A convenient
+nomenclature, inspired by pytorch, is :code:`import bellini.api.functional as F`.
+
+For example, say we want to take a log of a Normal Distribution. We can do this
+using the functional API as such
+
+.. highlight:: python
+.. code-block:: python
+
+    from bellini.quantity import Quantity as Q
+    from bellini.distributions import Normal
+    import bellini.api.functional as F
+
+    pre_log_normal = Normal(Q(0), Q(1)) # unitless distribution
+    log_normal = F.log(pre_log_normal)
+    # type(log_normal) = TransformedDistribution
+"""
+
 import bellini
 import pint
 import numpy as np
@@ -20,7 +45,7 @@ OPS = {
 }
 
 def _fn_wrapper(fn):
-    def wrapped_fn(*args, **kwargs):
+    def _wrapped_fn(*args, **kwargs):
         is_dist = np.array([
             isinstance(arg, bellini.Distribution)
             for arg in args
@@ -29,21 +54,7 @@ def _fn_wrapper(fn):
             isinstance(arg, bellini.Quantity)
             for arg in args
         ])
-        """
-        is_unitless = np.array([
-            not hasattr(arg, "units")
-            for arg in args
-        ])
-        """
         is_unitless = np.array(~(is_dist | is_quantity))
-
-        """
-        #print(is_dist, is_quantity, is_unitless, fn)
-        assert (is_dist | is_quantity | is_unitless).all(), (
-            "bellini.api.functional only takes Quantities"
-            ", Distributions, and unitless scalars/arrays as args"
-        )
-        """
 
         if is_unitless.all():
             #print(fn, type(fn))
@@ -82,10 +93,14 @@ def _fn_wrapper(fn):
                     print("Consider stripping units before input and attaching them after computation", file=sys.stderr)
                     raise e
 
-    return wrapped_fn
+    return _wrapped_fn
 
-def __getattr__(name):
-    if name in OPS.keys():
+def __getattribute__(name):
+    # when getting special attributes, return the actual module's attr
+    # instead of a function
+    if name[:2] == '__' and name[-2:] == '__':
+        return __getattr__(name)
+    elif name in OPS.keys():
         return OPS[name]
     else:
         if bellini.infer:

@@ -61,7 +61,7 @@ class MeasurementDevice(Device):
 # =============================================================================
 
 class LiquidTransfer(ActionableDevice):
-    """ Transfer an amount of liquid from one container to another with Gaussian error """
+    """ Transfer an amount of liquid from one container to another with specified error """
     _SUPPORTED_DISTS = ["Normal", "LogNormal", "TruncatedNormal", None]
     def __init__(self, name, var, noise_model="Normal"):
         """
