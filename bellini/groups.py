@@ -18,7 +18,8 @@ from bellini.laws import Law
 from bellini.quantity import Quantity
 from bellini.distributions import Distribution
 from bellini.api import utils
-from bellini.units import ureg, VOLUME_UNIT
+from bellini.units import ureg, VOLUME_UNIT, CONCENTRATION_UNIT
+from collections import defaultdict
 
 # =============================================================================
 # BASE CLASS
@@ -100,6 +101,9 @@ class Group(abc.ABC):
             return self.values[name]
         else:
             return super().__getattribute__(name)
+
+    def _register(self, name, item):
+        self.values[name] = item
 
     def __eq__(self, new_group):
         return {
@@ -514,18 +518,20 @@ class Solution(Liquid):
             Solvent
         )
 
-        if 'concentrations' not in values.keys():
-            self._concentrations = {
-                substance.species: substance.moles/solvent.volume
-                for substance in mixture.substances
-            }
-
         super().__init__(
             mixture=mixture,
             solvent=solvent,
             **values
         )
 
+    @classmethod
+    def _empty_dict_attr(self):
+        def zero_conc():
+            return Quantity(0, CONCENTRATION_UNIT)
+        return defaultdict(zero_conc)
+
+    def add_dict_attr(self, name):
+        self._register(name, Solution._empty_dict_attr())
 
     def copy(self):
         return Solution(
@@ -552,10 +558,11 @@ class Solution(Liquid):
     def concentrations(self):
         """ The concentrations of all solutes dissolved """
         if not hasattr(self, "_concentrations"):
-            self._concentrations = {
+            self.add_dict_attr("_concentrations")
+            self._concentrations.update({
                 substance.species: substance.moles/self.solvent.volume
                 for substance in self.mixture.substances
-            }
+            })
         return self._concentrations
 
     def __repr__(self):
