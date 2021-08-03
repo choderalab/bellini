@@ -11,6 +11,7 @@ from .procedure import *
 from . import quantity, groups, distributions, procedure
 
 def set_verbose(v = True):
+    """ Set the verbosity of object labels """
     global verbose
     verbose = v
 set_verbose(False)
@@ -18,6 +19,8 @@ set_verbose(False)
 _backend_default="numpyro"
 _supported_backends = ["numpyro"]
 def set_backend(bk):
+    """ Set which high-performance backend to use. Current supported backend are
+     ["numpyro"] """
     global backend
     if bk in _supported_backends:
         backend = bk
@@ -26,6 +29,7 @@ def set_backend(bk):
 set_backend(_backend_default)
 
 class inference:
+    """ Context wrapper for running bellini in design or inference mode """
     def __init__(self, _infer = True):
         global infer
         self._old_infer = infer
@@ -40,6 +44,7 @@ class inference:
 
 
 def set_infer(i = False):
+    """ Set bellini to run in design or inference mode """
     global infer
     infer = i
 set_infer(False)

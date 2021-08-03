@@ -6,12 +6,14 @@ bellini
 
 Bayesian Learning on Laboratory Investigations
 
+For preliminary documentation, see our [ReadTheDocs](https://bellini.readthedocs.io/en/dev-ajl/) page!
+
 ### Copyright
 
 Copyright (c) 2021, Alex Li and Yuanqing Wang
 
 
 #### Acknowledgements
- 
-Project based on the 
+
+Project based on the
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.5.
