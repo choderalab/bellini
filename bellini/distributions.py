@@ -210,7 +210,7 @@ class ComposedDistribution(Distribution):
     def __init__(self, distributions, op):
         super().__init__()
         assert len(distributions) == 2 # two at a time
-        assert utils.check_shape(*distributions)
+        assert utils.check_shape(*distributions)#, f"{distributions} {distributions[0].shape} {distributions[1].shape}"
         self.distributions = distributions
         self.op = op
 
@@ -480,7 +480,8 @@ class _JITDistribution(Distribution):
         )
         for key, arg in self.inputs.items():
             if isinstance(arg, dict): # so we can hash dict-like args
-                arg = tuple(arg.keys())
+                #print(arg)
+                arg = tuple(arg.values())
                 for a in arg:
                     g.add_node(
                         a,
@@ -490,7 +491,7 @@ class _JITDistribution(Distribution):
                     g.add_edge(
                         a,
                         self,
-                        etype="is_arg_of"
+                        etype="is_arg_of",
                     )
                     g = nx.compose(g, a.g)
             else:

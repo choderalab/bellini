@@ -76,18 +76,33 @@ class Procedure(abc.ABC):
         results = device.readout_state(self.exp_state, **arg_names)
         return results
 
-    def apply_law(self, law, container_name):
+    def apply_law(self, law, container_name, timesteps=1):
         """ Apply law `law` to container `container_name` """
-        # get container and apply law
+
+        '''
         container = self.exp_state[container_name]
         lawed_container = container.apply_law(law)
+        '''
+        assert timesteps > 0, "must have timesteps > 0"
+        # get containers and apply law
+        containers = {}
+        current_timestep = len(self.timeline) - 1
+        for step in range(timesteps):
+            containers[step] = self.timeline[current_timestep - step][container_name]
+
+        lawed_container = Container(
+            law({
+                step: c.solution
+                for step, c in containers.items()
+            })
+        )
         # generate new exp state and update timeline
         new_exp_state = self.exp_state.copy()
         new_exp_state[container_name] = lawed_container
         self.exp_state = new_exp_state
         self.timeline.append(new_exp_state)
         # update belief subgraphs
-        belief_graph = {lawed_container: (container,)}
+        belief_graph = {lawed_container: tuple(containers.values())}
         self.belief_subgraphs.append((belief_graph, law))
         # index for future exp retrieval if necessary
         return len(self.timeline)-1

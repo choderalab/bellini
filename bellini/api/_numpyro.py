@@ -54,7 +54,9 @@ def graphs_to_numpyro_model(graph_list):
                     parameters = {}
                     for param_name, param in node.parameters.items():
                         eval_node(param)
-                        parameters[param_name] = model_dict[param].magnitude
+                        # we assume all the parameters are of the same unit as node
+                        # i think this should be reasonable?
+                        parameters[param_name] = model_dict[param].to(node.units).magnitude
 
                     sample = numpyro.sample(
                         name,
@@ -133,16 +135,39 @@ def graphs_to_numpyro_model(graph_list):
                     inputs = node.inputs
                     label = node.label
 
+                    def _gen_cache_key(inputs):
+                        hashable_inputs = []
+                        for key, entry in inputs.items():
+                            if isinstance(entry, dict):
+                                hashable_inputs.append(
+                                    (
+                                        key,
+                                        tuple(entry.items())
+                                    )
+                                )
+                            else:
+                                hashable_inputs.append((key, entry))
+                        return tuple(hashable_inputs)
+
                     for arg in inputs.values():
-                        eval_node(arg)
+                        if isinstance(arg, dict):
+                            for arg_val in arg.values():
+                                eval_node(arg_val)
+                        else:
+                            eval_node(arg)
 
                     # caching fn outputs since fn could potentially be expensive
-                    _cache_key = (fn, ((k,v) for k,v in inputs.items()))
+                    _cache_key = (fn, _gen_cache_key(inputs))
                     if _cache_key not in _jit_dist_cache.keys():
-                        sampled_inputs = {
-                            key: model_dict[arg]
-                            for key, arg in inputs.items()
-                        }
+                        sampled_inputs = {}
+                        for key, arg in inputs.items():
+                            if isinstance(arg, dict):
+                                sampled_inputs[key] = {
+                                    k: model_dict[v]
+                                    for k,v in arg.items()
+                                }
+                            else:
+                                sampled_inputs[key] = model_dict[arg]
 
                         _jit_dist_cache[_cache_key] = fn(**sampled_inputs)
 

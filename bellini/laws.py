@@ -15,7 +15,7 @@ class Law(object):
         """
         Parameters
         ----------
-        
+
         law_fn : Python callable
             a function that takes kwarg inputs based on
             `input_mapping`'s labels and returns a dict storing law outputs. the
@@ -46,7 +46,21 @@ class Law(object):
             to the output of law_fn and/or output_labels
         """
 
+        assert isinstance(input_mapping, dict)
+
+        all_str_keys = np.array([isinstance(key, str) for key in input_mapping.keys()]).all()
+        all_int_keys = np.array([isinstance(key, int) for key in input_mapping.keys()]).all()
+        assert all_str_keys or all_int_keys, ("input_mapping must either be for one"
+        " Group specifically (in which all keys should be strings), or be the "
+        " same Group across different timesteps (in which all keys should be ints)"
+        )
+
+        # if all string keys, we're only looking at the most recent timestep
+        if all_str_keys:
+            input_mapping = {0: input_mapping}
         self.input_mapping = input_mapping
+
+
         if output_labels:
             assert np.array([
                 isinstance(label, Ref) for label in output_labels
@@ -64,39 +78,58 @@ class Law(object):
     def __repr__(self):
         return self.name
 
-    def __call__(self, group):
-        assert isinstance(group, bellini.Group)
-
-        # retrieve inputs
-        inputs = {}
-        for kwarg, inpt in self.input_mapping.items():
-            # if we want to grab something from an attribute that's a dict
-            if isinstance(inpt, (tuple, list)):
-                assert len(inpt) == 2, "we only support indexing one layer deep"
-                inpt, key = inpt
-                dict_attr = getattr(group, inpt, None)
-                assert isinstance(dict_attr, dict)
-                if key in dict_attr.keys():
-                    inputs[kwarg] = dict_attr[key]
-                    continue
-            elif isinstance(inpt, Ref):
-                attr = getattr(group, inpt.name)
-                inputs[kwarg] = inpt.retrieve_index(attr)
-                continue
+    def _retrieve_args(self, group_dict):
+        def get_ref_in_group(group, ref):
+            if isinstance(ref, Ref):
+                attr = getattr(group, ref.name)
+                return ref.retrieve_index(attr)
+            elif isinstance(ref, str):
+                return getattr(group, ref)
+            elif isinstance(ref, dict):
+                dict_arg = {}
+                for key, subref in ref.items():
+                    dict_arg[key] = get_ref_in_group(group, subref)
+                return dict_arg
             else:
-                if hasattr(group, inpt):
-                    inputs[kwarg] = getattr(group, inpt)
-                    continue
-            raise ValueError(f"{group} and params does not have required attribute {inpt} for use as keyword {kwarg} in {self}")
+                raise ValueError(f"{group} and params does not have required attribute {ref} for use in {self}")
 
+        args = {}
+        for timestep, input_mapping in self.input_mapping.items():
+            group = group_dict[timestep]
+            for fn_kwarg, input_ref in input_mapping.items():
+                    args[fn_kwarg] = get_ref_in_group(group, input_ref)
+
+        return args
+
+    def __call__(self, group_dict):
+
+        # so you can call a law on a single group
+        if isinstance(group_dict, bellini.Group):
+            group_dict = {0: group_dict}
+
+        for group in group_dict.values():
+            assert isinstance(group, bellini.Group)
+
+        inputs = self._retrieve_args(group_dict)
         inputs.update(self.params)
+
+        def contains_dist(arg):
+            if isinstance(arg, bellini.Distribution):
+                return True
+            else:
+                if isinstance(arg, (list, tuple)):
+                    return np.array([contains_dist(r) for r in arg]).any()
+                elif isinstance(arg, dict):
+                    return np.array([contains_dist(r) for r in arg.values()]).any()
+                else:
+                    return False
 
         # compute values
         is_dist = np.array([
-            isinstance(arg, bellini.Distribution) for arg in inputs.values()
+            contains_dist(arg) for arg in inputs.values()
         ])
         if is_dist.any():
-            assert self.output_labels is not None
+            #assert self.output_labels is not None
             # compute deterministic outputs on the outside
             # so we can reduce computation by only running `fn` once
             def to_quantity(arg):
@@ -116,7 +149,7 @@ class Law(object):
 
             outputs = {}
             deterministic_outputs = self.law_fn(**deterministic_args)
-            for label in self.output_labels:
+            for label in deterministic_outputs.keys():#self.output_labels:
                 outputs[label] = _JITDistribution(
                     self.law_fn,
                     inputs,
@@ -126,11 +159,13 @@ class Law(object):
         else:
             outputs = self.law_fn(**inputs)
 
+        latest_group = group_dict[0]
+
         # create new group with law applied
         if self.group_create_fn:
-            new_group = self.group_create_fn(outputs, group)
+            new_group = self.group_create_fn(outputs, latest_group, self)
         else: # default behavior
-            new_group = bellini.LawedGroup(group, self)
+            new_group = bellini.LawedGroup(latest_group, self)
             for ref, value in outputs.items():
                 name = ref.name
                 if hasattr(new_group, name):
