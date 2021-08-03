@@ -28,6 +28,11 @@ class Container(object):
         else:
             return repr(self)
 
+    @name.setter
+    def name(self, x):
+        assert isinstance(x, str)
+        self._name = x
+
     def __getattr__(self, name):
         if name in self.values.keys():
             return self.values[name]
