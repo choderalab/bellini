@@ -524,6 +524,11 @@ class Solution(Liquid):
             **values
         )
 
+        # compute _concentrations
+        # since otherwise two solutions that are the same might
+        # register as different
+        _ = self.concentrations
+
     @classmethod
     def _empty_dict_attr(self):
         def zero_conc():
