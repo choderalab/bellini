@@ -11,10 +11,13 @@ from collections import OrderedDict
 # =============================================================================
 # MODULE CLASSES
 # =============================================================================
+
+
 def _is_exp_obj(x):
     return isinstance(x, (
         Group, Distribution, Quantity, Container
     ))
+
 
 class Procedure(abc.ABC):
     """
@@ -128,7 +131,10 @@ class Procedure(abc.ABC):
         self.__setattr__(name, x)
 
     def __repr__(self):
-        return 'Procedure containing %s' % str(self.objects)
+        return 'Procedure containing %s and %s' % (
+            str(self.exp_state),
+            str(self.devices)
+        )
 
     def _build_graph(self):
         import networkx as nx # local import
