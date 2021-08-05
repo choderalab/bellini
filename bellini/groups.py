@@ -524,6 +524,13 @@ class Solution(Liquid):
             **values
         )
 
+        # if concentrations are provided, set internal concentrations attribute
+        # to that
+        if "concentrations" in values.keys():
+            self.add_dict_attr("_concentrations")
+            self._concentrations.update(values['concentrations'])
+            del self.values["concentrations"]
+
         # compute _concentrations
         # since otherwise two solutions that are the same might
         # register as different
@@ -568,7 +575,11 @@ class Solution(Liquid):
                 substance.species: substance.moles/self.solvent.volume
                 for substance in self.mixture.substances
             })
-        return self._concentrations
+        # the philosophy behind this is that you shouldn't be able to edit the
+        # concentrations directly, as that makes the solution
+        # internally inconsistent. there's probably a way to do this
+        # rigorously, but that's left as a TODO
+        return self._concentrations.copy()
 
     def __repr__(self):
         return " and ".join([
