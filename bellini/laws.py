@@ -7,6 +7,7 @@ from bellini.distributions import Distribution, _JITDistribution
 import numpy as np
 from bellini.reference import Reference as Ref
 
+
 class Law(object):
     """ An object that applies some physical law on a group, grabbing inputs
     dictated by `input_mapping`, applying `law_fn`, and returning a new instance
@@ -45,6 +46,9 @@ class Law(object):
             be a copy of the original group, with new attributes set according
             to the output of law_fn and/or output_labels
         """
+        # TODO: update output_labels docstring to reflect that you don't need
+        # to provide output_labels but that law_fn must return a dict with
+        # `Ref` keys you want to use default group creation
 
         assert isinstance(input_mapping, dict)
 
@@ -140,8 +144,10 @@ class Law(object):
                         return [to_quantity(r) for r in arg]
                     elif isinstance(arg, dict):
                         return {key: to_quantity(value) for key, value in arg.items()}
-                    else:
+                    elif isinstance(arg, Distribution):
                         return bellini.Quantity(arg.magnitude, arg.units)
+                    else:
+                        return bellini.Quantity(arg)
 
             deterministic_args = {}
             for key, arg in inputs.items():
@@ -164,7 +170,7 @@ class Law(object):
         # create new group with law applied
         if self.group_create_fn:
             new_group = self.group_create_fn(outputs, latest_group, self)
-        else: # default behavior
+        else:  # default behavior
             new_group = bellini.LawedGroup(latest_group, self)
             for ref, value in outputs.items():
                 name = ref.name

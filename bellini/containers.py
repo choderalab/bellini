@@ -12,6 +12,7 @@ from bellini.reference import Reference as Ref
 # Containers
 # =============================================================================
 
+
 class Container(object):
     """ Simple container for a solution """
     def __init__(self, solution=None, name=None, **values):
@@ -43,7 +44,7 @@ class Container(object):
         return {
                 **self.values,
                 'name': self.name
-            } ==  {
+            } == {
                 **new_group.values,
                 'name': new_group.name
             }
@@ -57,7 +58,8 @@ class Container(object):
 
     def retrieve_aliquot(self, volume):
         """ Removes an aliquot and returns it """
-        assert self.solution is not None # TODO: check that volume is enough to remove an aliquot
+        # TODO: check that volume is enough to remove an aliquot
+        assert self.solution is not None
         aliquot, source = self.solution.aliquot(volume)
         return aliquot, Container(solution=source, name=self.name)
 

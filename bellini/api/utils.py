@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import torch
 import bellini
-from bellini.units import *
+from bellini.units import ureg, to_internal_units
 
 def is_scalar(num):
     """ Returns if `num` is a scalar i.e. float, int, or `np.generic`
@@ -68,3 +68,58 @@ def check_shape(a, b):
     if a.shape != () and b.shape != ():
         return a.shape == b.shape
     return True
+
+def check_broadcastable(*args):
+    try:
+        shape_args = [np.empty(arg.shape) for arg in args]
+        np.broadcast(*shape_args)
+        return True
+    except ValueError:
+        return False
+
+# TODO:
+#
+# flatten args util
+# args to quantity util
+#
+
+def flatten(args, keep_keys=False):
+    ret = []
+    if isinstance(args, dict):
+        for key, value in args.items():
+            if keep_keys:
+                ret += flatten(key)
+            ret += flatten(value)
+    elif isinstance(args, (list, tuple)):
+        for arg in args:
+            ret += flatten(arg)
+    else:
+        ret.append(args)
+    return ret
+
+def _to_x_constructor(fn):
+    def _to_x(args):
+        if isinstance(args, dict):
+            return {
+                key: _to_x(value)
+                for key, value in args.items()
+            }
+        elif isinstance(args, list):
+            return [_to_x(arg) for arg in args]
+        elif isinstance(args, tuple):
+            return tuple([_to_x(arg) for arg in args])
+        else:
+            return fn(args)
+    return _to_x
+
+def _to_quantity(arg):
+    if isinstance(arg, bellini.Distribution):
+        return bellini.Quantity(arg.magnitude, arg.units)
+    elif isinstance(arg, bellini.Quantity):
+        return arg
+    elif is_arr(arg) or is_scalar(arg):
+        return bellini.Quantity(arg)
+    else:
+        raise ValueError(f"unable to convert {arg} to Quantity")
+
+args_to_quantity = _to_x_constructor(_to_quantity)

@@ -6,19 +6,24 @@ import abc
 import pint
 import numpy as np
 import jax.numpy as jnp
+from jax import lax
 import bellini
+import bellini.api.functional as F
 from bellini.distributions import Distribution, Normal, gen_lognorm, TruncatedNormal
 from bellini.quantity import Quantity
 from bellini.containers import Container
 from bellini.units import VOLUME_UNIT
 from bellini.reference import Reference as Ref
+import warnings
 
 # =============================================================================
 # BASE CLASS
 # =============================================================================
 
+
 class Device(abc.ABC):
     """ Base class for devices (objects that don't change over a procedure) """
+
 
 class ActionableDevice(Device):
     """ Base class for object that can manipulate experiment objects """
@@ -37,6 +42,7 @@ class ActionableDevice(Device):
         as well as a belief graph relating the old experimetal state to the new one.
         """
         raise NotImplementedError
+
 
 class MeasurementDevice(Device):
     """ Base function for measurement instruments """
@@ -59,6 +65,7 @@ class MeasurementDevice(Device):
 # =============================================================================
 # SUBMODULE CLASS
 # =============================================================================
+
 
 class LiquidTransfer(ActionableDevice):
     """ Transfer an amount of liquid from one container to another with specified error """
@@ -152,6 +159,7 @@ class LiquidTransfer(ActionableDevice):
 
         return new_experiment_state, belief_graph
 
+
 class Measurer(MeasurementDevice):
     """ Measure a property of one container with Gaussian error """
     def __init__(self, name, var):
@@ -188,3 +196,36 @@ class Measurer(MeasurementDevice):
             raise ValueError(f"container_ref must be Reference or str, but is {container_ref}")
         measurement = self.readout(container, value, key)
         return {(value, key): measurement} if key else {value: measurement}
+
+
+class Routine(Device):
+    """ Allows efficient repetition of a procedure subroutine in numpyro """
+    def __init__(self, objs_to_carry, carry_to_objs, subroutine,
+                 output_units, params, measure_var=None):
+        if bellini.backend != "numpyro":
+            warnings.warn("Routines are numpyro-specific and have not been "
+            "tested on different backends")
+        self.compress = objs_to_carry
+        self.extract = carry_to_objs
+        self.subroutine = subroutine
+        self.output_units = output_units
+        self.params = params
+        self.measure_var = measure_var
+        if measure_var:
+            assert measure_var.dimensionality == output_units.dimensionality
+
+    def perform(self, objs, xs):
+        def f(carry, x):
+            interal_objs = self.extract(carry)
+            updated_objs, output = self.subroutine(internal_objs, x, self.params)
+            new_carry = self.compress(updated_objs)
+            return new_carry, output
+
+        init_carry = self.compress(objs)
+        final_carry, outputs = F.functional_for(f, init_carry, xs)
+        final_objs = self.extract(final_carry)
+        outputs = Q(outputs, self.output_units)
+        if self.measure_var:
+            outputs = Normal(outputs, self.measure_var)
+
+        return final_objs, outputs

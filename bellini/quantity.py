@@ -2,12 +2,20 @@
 # IMPORTS
 # =============================================================================
 import numpy as np
+import jax
 import jax.numpy as jnp
 import torch
 import bellini
 import pint
 from bellini.api import utils
 from pint.errors import DimensionalityError
+
+
+from pint.compat import (
+    eq,
+    is_duck_array_type,
+    zero_or_nan,
+)
 
 # =============================================================================
 # MODULE CLASSES
@@ -123,12 +131,67 @@ class Quantity(pint.quantity.Quantity):
         self_base = self.to_base_units()
         # TODO: faster way to hash an array?
         # str(arr.sum()) + str((arr**2).sum()) is a possibility for large arrays
-        if utils.is_arr(self.magnitude):
-            return hash((self_base.__class__, self_base.magnitude.tobytes(), self_base.units))
-        return super().__hash__()
+        #if utils.is_arr(self.magnitude):
+        #print(type(self_base.magnitude))
+        if isinstance(self_base.magnitude, jax.interpreters.partial_eval.DynamicJaxprTracer):
+            return hash((self_base.__class__, self_base.magnitude.shape, self_base.units))
+        return hash((self_base.__class__, self_base.magnitude.tobytes(), self_base.units))
+        #return super().__hash__()
 
     def __eq__(self, other):
-        is_eq = super().__eq__(other)
+        def super_eq(self, other):
+            def bool_result(value):
+                nonlocal other
+
+                if not is_duck_array_type(type(self._magnitude)):
+                    return value
+
+                if isinstance(other, Quantity):
+                    other = other._magnitude
+
+                template, _ = np.broadcast_arrays(self._magnitude, other)
+                return np.full_like(template, fill_value=value, dtype=np.bool_)
+
+            # We compare to the base class of Quantity because
+            # each Quantity class is unique.
+            if not isinstance(other, Quantity):
+                if zero_or_nan(other, True):
+                    # Handle the special case in which we compare to zero or NaN
+                    # (or an array of zeros or NaNs)
+                    if self._is_multiplicative:
+                        # compare magnitude
+                        return eq(self._magnitude, other, False)
+                    else:
+                        # compare the magnitude after converting the
+                        # non-multiplicative quantity to base units
+                        if self._REGISTRY.autoconvert_offset_to_baseunit:
+                            return eq(self.to_base_units()._magnitude, other, False)
+                        else:
+                            raise OffsetUnitCalculusError(self._units)
+
+                if self.dimensionless:
+                    return eq(
+                        self._convert_magnitude_not_inplace(self.UnitsContainer()),
+                        other,
+                        False,
+                    )
+
+                return bool_result(False)
+
+            if self._units == other._units:
+                return eq(self._magnitude, other._magnitude, False)
+
+            try:
+                return eq(
+                    self._convert_magnitude_not_inplace(other._units),
+                    other._magnitude,
+                    False,
+                )
+            except DimensionalityError:
+                return bool_result(False)
+
+
+        is_eq = super_eq(self, other)
         if utils.is_arr(is_eq):
             return is_eq.all()
         return is_eq

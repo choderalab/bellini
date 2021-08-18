@@ -1,7 +1,7 @@
 """ Groups are objects that represent experimental reagents, e.g. compounds,
 buffers, solvents, etc.
 
-The key thing to remember is that Groups are not immutable e.g. any operation
+The key thing to remember is that Groups are immutable e.g. any operation
 using groups will produce new Groups rather than modifying existing Groups'
 parameters.
 """
@@ -24,6 +24,7 @@ from collections import defaultdict
 # =============================================================================
 # BASE CLASS
 # =============================================================================
+
 
 class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
@@ -130,6 +131,7 @@ class Group(abc.ABC):
 # equilibirium conc, multiple conc. -> multiple conc. # with
 # observation model
 
+
 class LawedGroup(Group):
     """ Class constructed by default for a Group after a Law has been applied to it """
     def __new__(cls, group, law):
@@ -168,6 +170,7 @@ class LawedGroup(Group):
 # Chemicals
 # =============================================================================
 
+
 class Chemical(Group):
     """ Base class for all chemical-like Groups """
     @abc.abstractmethod
@@ -190,6 +193,7 @@ class Chemical(Group):
         assert isinstance(x, (Quantity, Distribution))
         assert x.units.dimensionality == ureg.dimensionless.dimensionality
         return x
+
 
 class Species(Chemical):
     """ A chemical species without mass. """
@@ -313,6 +317,7 @@ class Liquid(Chemical):
         """
         raise NotImplementedError()
 
+
 class Solvent(Liquid):
     """ A chemical substance with species and volume. """
     def __init__(self, species, volume, **values):
@@ -384,7 +389,7 @@ class Solvent(Liquid):
         source: Solvent
             The remaining solution after the aliquot has been removed
         """
-        #assert volume.units == VOLUME_UNIT
+        # assert volume.units == VOLUME_UNIT
 
         aliquot = Solvent(
             species=self.species,
@@ -501,6 +506,7 @@ class Mixture(Chemical):
             ) for substance in self.substances
         ]
         return Mixture(substances=substances)
+
 
 class Solution(Liquid):
     """ A substance or a mixture dissolved in a solvent """

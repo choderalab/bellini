@@ -210,23 +210,18 @@ class ComposedDistribution(Distribution):
     def __init__(self, distributions, op):
         super().__init__()
         assert len(distributions) == 2 # two at a time
-        assert utils.check_shape(*distributions)#, f"{distributions} {distributions[0].shape} {distributions[1].shape}"
+        assert utils.check_broadcastable(*distributions)#, f"{distributions} {distributions[0].shape} {distributions[1].shape}"
         self.distributions = distributions
         self.op = op
 
         try:
-            with bellini.inference(False):
-                np_args = [
-                    bellini.Quantity(arg.magnitude, arg.units)
-                    if not isinstance(arg, bellini.Quantity) else arg
-                    for arg in self.distributions
-                ]
-                mag = getattr(F, self.op)(
-                    *np_args,
-                )
-                self._units = mag.units
-                self._internal_units = get_internal_units(mag)
-                self._magnitude = mag.magnitude
+            np_args = utils.args_to_quantity(self.distributions)
+            mag = getattr(F, self.op)(
+                *np_args,
+            )
+            self._units = mag.units
+            self._internal_units = get_internal_units(mag)
+            self._magnitude = mag.magnitude
         except ValueError:
             raise NotImplementedError("computing units/dimensionality for given operation not supported")
 
@@ -311,9 +306,10 @@ class TransformedDistribution(Distribution):
     """ A transformed distribution from one base distribution. """
     def __init__(self, args, op, **kwargs):
         super().__init__()
+
         args_contains_dist = np.array([
             isinstance(arg, Distribution)
-            for arg in args
+            for arg in utils.flatten(args)
         ]).any()
         assert args_contains_dist, "TransformedDistribution must have a Distribution as an argument"
 
@@ -322,12 +318,8 @@ class TransformedDistribution(Distribution):
         self.kwargs = kwargs
 
         try:
-            with bellini.inference(False):
-                np_args = [
-                    bellini.Quantity(arg.magnitude, arg.units)
-                    if not isinstance(arg, bellini.Quantity) else arg
-                    for arg in self.args
-                ]
+            with bellini.inference(False): # forces np calculations on init
+                np_args = utils.args_to_quantity(self.args)
                 mag = getattr(F, self.op)(
                     *np_args,
                     **self.kwargs
@@ -377,17 +369,31 @@ class TransformedDistribution(Distribution):
             kwargs = self.kwargs
         )
         for idx, arg in enumerate(self.args):
-            g.add_node(
-                arg,
-                ntype="arg",
-                pos=idx
-            )
-            g.add_edge(
-                arg,
-                self,
-                etype="is_arg_of"
-            )
-            g = nx.compose(g, arg.g)
+            if isinstance(arg, (list, tuple)):
+                for a in arg:
+                    g.add_node(
+                        a,
+                        ntype="arg",
+                        pos=idx
+                    )
+                    g.add_edge(
+                        a,
+                        self,
+                        etype="is_arg_of"
+                    )
+                    g = nx.compose(g, a.g)
+            else:
+                g.add_node(
+                    arg,
+                    ntype="arg",
+                    pos=idx
+                )
+                g.add_edge(
+                    arg,
+                    self,
+                    etype="is_arg_of"
+                )
+                g = nx.compose(g, arg.g)
         self._g = g
         return g
 
@@ -493,7 +499,26 @@ class _JITDistribution(Distribution):
                         self,
                         etype="is_arg_of",
                     )
-                    g = nx.compose(g, a.g)
+                    try:
+                        g = nx.compose(g, a.g)
+                    except AttributeError:
+                        pass
+            elif isinstance(arg, (list, tuple)):
+                for a in arg:
+                    g.add_node(
+                        a,
+                        ntype="arg",
+                        key=key
+                    )
+                    g.add_edge(
+                        a,
+                        self,
+                        etype="is_arg_of",
+                    )
+                    try:
+                        g = nx.compose(g, a.g)
+                    except AttributeError:
+                        pass
             else:
                 g.add_node(
                     arg,
@@ -505,7 +530,10 @@ class _JITDistribution(Distribution):
                     self,
                     etype="is_arg_of"
                 )
-                g = nx.compose(g, arg.g)
+                try:
+                    g = nx.compose(g, arg.g)
+                except AttributeError:
+                    pass
         self._g = g
         return g
 
@@ -520,6 +548,12 @@ class _JITDistribution(Distribution):
             self,
             new_units,
             force=force
+        )
+
+    def __getitem__(self, idxs):
+        return TransformedDistribution(
+            [self, idxs],
+            op = "slice"
         )
 
 
