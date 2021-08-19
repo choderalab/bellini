@@ -83,6 +83,7 @@ class Law(object):
         return self.name
 
     def _retrieve_args(self, group_dict):
+        """ Grab the proper arguments from `group_dict` and return them """
         def get_ref_in_group(group, ref):
             if isinstance(ref, Ref):
                 attr = getattr(group, ref.name)
@@ -106,7 +107,8 @@ class Law(object):
         return args
 
     def __call__(self, group_dict):
-
+        """ Return the most recent group after the law has been applied.
+        `group_dict` should be a dict structured timestep (int) -> Group. """
         # so you can call a law on a single group
         if isinstance(group_dict, bellini.Group):
             group_dict = {0: group_dict}

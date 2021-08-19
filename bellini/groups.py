@@ -30,6 +30,15 @@ class Group(abc.ABC):
     """ Base class for groups that hold quantities and children. """
 
     def __init__(self, name=None, **values):
+        """
+        Parameters
+        ----------
+        name: str
+            Name of the group
+
+        **values
+            Values to be stored in the group
+        """
         self.values = values
         self._name = name
 
@@ -140,6 +149,15 @@ class LawedGroup(Group):
         return group.copy()
 
     def __init__(self, group, law):
+        """
+        Parameters
+        ----------
+        group: Group
+            Base Group that `law` will be applied to
+
+        law: Law
+            Law that is applied to `group`
+        """
         super().__init__(
             base_group = group,
             law = law
@@ -188,6 +206,7 @@ class Chemical(Group):
         return self.__mul__(x)
 
     def _sanitize(self, x):
+        """ Make sure `x` is a suitable input """
         if utils.is_scalar(x):
             x = Quantity(x, ureg.dimensionless)
         assert isinstance(x, (Quantity, Distribution))
@@ -198,6 +217,15 @@ class Chemical(Group):
 class Species(Chemical):
     """ A chemical species without mass. """
     def __init__(self, name, **values):
+        """
+        Parameters
+        ----------
+        name: str
+            Name of the species being represented
+
+        **values
+            Extra values to be stored
+        """
         super().__init__(name=name, **values)
 
     def copy(self):
@@ -236,6 +264,18 @@ class Species(Chemical):
 class Substance(Chemical):
     """ A chemical substance with species and number of moles. """
     def __init__(self, species, moles, **values):
+        """
+        Parameters
+        ----------
+        species: Species
+            The identity of the Substance
+
+        moles: Quantity (quantity units)
+            The number of moles of `species` present
+
+        **values
+            Extra values to be stored
+        """
         # check the type of species
         assert isinstance(
             species,
@@ -321,6 +361,18 @@ class Liquid(Chemical):
 class Solvent(Liquid):
     """ A chemical substance with species and volume. """
     def __init__(self, species, volume, **values):
+        """
+        Parameters
+        ----------
+        species: Species
+            The identity of the Substance
+
+        volume: Quantity (volume units)
+            The volume of `species` present
+
+        **values
+            Extra values to be stored
+        """
         # check the type of species
         assert isinstance(
             species,
@@ -414,6 +466,15 @@ class Solvent(Liquid):
 class Mixture(Chemical):
     """ A simple mixture of substances. """
     def __init__(self, substances, **values):
+        """
+        Parameters
+        ----------
+        substances: list of Substance
+            Substances that compose the Mixture
+
+        **values
+            Extra values to be stored
+        """
 
         sub_dict = {}
         shape = None
@@ -511,6 +572,19 @@ class Mixture(Chemical):
 class Solution(Liquid):
     """ A substance or a mixture dissolved in a solvent """
     def __init__(self, mixture, solvent, **values):
+        """
+        Parameters
+        ----------
+        mixture: Mixture or Substance
+            The solutes in the Solution. Can be fed an individual Substance
+            (which is converted into a Mixture) or a Mixture itself.
+
+        solvent: Solvent
+            The solute in the Solution.
+
+        **values
+            Extra values to be stored
+        """
         # check the type of substance and solvent
         if isinstance(mixture, Substance):
             mixture = Mixture([mixture])

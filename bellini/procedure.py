@@ -1,3 +1,6 @@
+"""
+Module used for moduling Procedures
+"""
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -14,6 +17,7 @@ from collections import OrderedDict
 
 
 def _is_exp_obj(x):
+    """ Returns if `x` is an experimental object """
     return isinstance(x, (
         Group, Distribution, Quantity, Container
     ))
@@ -26,6 +30,17 @@ class Procedure(abc.ABC):
     as well as instruments to manipulate these states
     """
     def __init__(self, objects=None, devices=None):
+        """
+        Parameters
+        ----------
+        objects: dict, optional
+            The experimental objects in the Procedure. Should be structured
+            label (str) -> object (usually Container)
+
+        devices: dict, optional
+            The experimental devices in Procedure. Should be structured
+            label (str) -> device (Device)
+        """
         super(Procedure, self).__init__()
         if objects:
             assert isinstance(objects, dict)
@@ -80,12 +95,20 @@ class Procedure(abc.ABC):
         return results
 
     def apply_law(self, law, container_name, timesteps=1):
-        """ Apply law `law` to container `container_name` """
+        """
+        Apply `law` to container `container_name`
 
-        '''
-        container = self.exp_state[container_name]
-        lawed_container = container.apply_law(law)
-        '''
+        Parameters
+        ----------
+        law: Law
+            Law to apply
+
+        container_name: str
+            Container to apply `law` on
+
+        timesteps: int, default=1
+            The number timesteps back to include when feeding Groups to `law`
+        """
         assert timesteps > 0, "must have timesteps > 0"
         # get containers and apply law
         containers = {}

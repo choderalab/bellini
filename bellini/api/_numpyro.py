@@ -1,3 +1,7 @@
+"""
+Module containing functions that compile bellini graphs into numpyro models
+"""
+
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -192,7 +196,7 @@ def _eval_node(node, model_dict, _jit_dist_cache, obs=None):
     return model_dict[node]
 
 def _lax_eval_node(node, model_dict, _jit_dist_cache, id_to_node={}, obs=None):
-    """ Evaluate node values recursively using DP """
+    """ Evaluate node values recursively using jit-able DP """
 
     def eval_unvisited_node(node, model_dict, _jit_dist_cache, id_to_node={}, obs=None):
         # draw directly from numpyro function for simple distribution

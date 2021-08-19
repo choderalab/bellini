@@ -1,3 +1,7 @@
+"""
+Module containing various experimental devices, which are used to manipuate
+either experimental objects or experimental states
+"""
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -72,6 +76,19 @@ class LiquidTransfer(ActionableDevice):
     _SUPPORTED_DISTS = ["Normal", "LogNormal", "TruncatedNormal", None]
     def __init__(self, name, var, noise_model="Normal"):
         """
+        Parameters
+        ----------
+        name: str
+            Name of the LiquidTransfer device. Will be used in assigning names
+            to each volume transfer sample
+
+        var: Quantity (volume units)
+            Error in volume drawn
+
+        noise_model: str, default="Normal"
+            Noise model that LiquidTransfer uses. Choices include "Normal",
+            "TruncatedNormal", "LogNormal", and `None`.
+
         TODO: allow variance to be drawn from a prior
         """
 
@@ -100,6 +117,27 @@ class LiquidTransfer(ActionableDevice):
             raise ValueError(f"noise model param of {self} is not valid")
 
     def apply(self, source, sink, volume):
+        """ Transfer `volume` from `source` to `sink`
+
+        Arguments
+        ---------
+        source : Container (not empty)
+            Container the aliquot is drawn from
+
+        sink: Container
+            Container the aliquot is placed in
+
+        volume: Quantity or Distribution (volume units)
+            Amount to transfer
+
+        Returns
+        -------
+        new_source: Container
+            `source` after the aliquot has been removed
+
+        new_sink : Container
+            `sink` after the aliquot has been removed
+        """
         # independent noise for each array element (TODO: is this valid?)
         if isinstance(source.volume.magnitude, np.ndarray):
             volume = volume * np.ones_like(source.volume.magnitude)
@@ -118,6 +156,33 @@ class LiquidTransfer(ActionableDevice):
         return new_source, new_sink
 
     def apply_state(self, experiment_state, source_ref, sink_ref, volume):
+        """ Transfer `volume` from `source_ref` in `experimental_state` to
+        `sink_ref` in `experimental_state`
+
+        Arguments
+        ---------
+        experimental_state : dict
+            Current experimental state
+
+        source_ref : Reference
+            Reference to Container the aliquot is drawn from
+
+        sink_ref : Reference
+            Reference to Container the aliquot is placed in
+
+        volume: Quantity or Distribution (volume units)
+            Amount to transfer
+
+        Returns
+        -------
+        new_experiment_state : dict
+            Experimental state after volume transfer
+
+        belief_graph : dict
+            dict of (current experimental object) -> (all dependent previous
+            experimental objects)
+
+        """
         # retrieve source and sink containers
         if isinstance(source_ref, Ref):
             source_outer = experiment_state[source_ref.name]
@@ -164,8 +229,16 @@ class Measurer(MeasurementDevice):
     """ Measure a property of one container with Gaussian error """
     def __init__(self, name, var):
         """
-        TODO: allow variance to be drawn from a prior, update name for multiple
-        measurements
+        Parameters
+        ----------
+        name: str
+            Name of the LiquidTransfer device. Will be used in assigning names
+            to each volume transfer sample
+
+        var: Distribution (volume units)
+            Error in volume drawn.
+
+        TODO: allow variance to be drawn from a prior
         """
 
         if isinstance(var, Quantity):
@@ -178,6 +251,21 @@ class Measurer(MeasurementDevice):
         self.units = self.var.units
 
     def readout(self, container, value, key=None):
+        """ Readout `value` from `container`
+
+        Arguments
+        ---------
+        container : Container (not empty)
+            Container `value` is readout from
+
+        value : Reference or str
+            What attribute to readout from `container`
+
+        Returns
+        -------
+        measurement 
+            The measured value with some Gaussian noise
+        """
         prenoise_value = container.observe(value, key=key)
         assert prenoise_value.dimensionality == self.units.dimensionality
         measurement = Normal(prenoise_value, self.var)
@@ -187,6 +275,25 @@ class Measurer(MeasurementDevice):
         return measurement
 
     def readout_state(self, experiment_state, container_ref, value, key=None):
+        """ Readout `value` from `container_ref` in `experimental_state`
+
+        Arguments
+        ---------
+        experimental_state : dict
+            Current experimental state
+
+        container_ref : Reference or str
+            Reference to Container `value` is readout from
+
+        value : Reference or str
+            What attribute to readout from `container`
+
+        Returns
+        -------
+        measurement_dict : dict
+            dict of `value` -> measurement, the measured value with some
+            Gaussian noise
+        """
         if isinstance(container_ref, Ref):
             container_outer = experiment_state[container_ref.name]
             container = container_ref.retrieve_index(container_outer)
@@ -199,7 +306,8 @@ class Measurer(MeasurementDevice):
 
 
 class Routine(Device):
-    """ Allows efficient repetition of a procedure subroutine in numpyro """
+    """ [EXPERIMENTAL] Allows efficient repetition of a procedure subroutine
+    in numpyro. """
     def __init__(self, objs_to_carry, carry_to_objs, subroutine,
                  output_units, params, measure_var=None):
         if bellini.backend != "numpyro":

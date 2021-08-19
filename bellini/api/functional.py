@@ -48,8 +48,12 @@ OPS = {
 }
 
 def _fn_wrapper(fn):
+    """ Returned wrapper for called functions. This wrapper assesses whether or
+    not the given arguments are Quantities or Distributions. If all arguments
+    are Quantities, deterministic computation is done automatically. If there
+    are Distributions as arguments, a TransformedDistribution is created instead,
+    which will be evaluated at compile time. """
     def _wrapped_fn(*args, **kwargs):
-
         flat_args = flatten(args)
         is_dist = np.array([
             isinstance(arg, bellini.Distribution)
@@ -109,6 +113,9 @@ def _fn_wrapper(fn):
 
 
 def functional_for(f, init, xs, length=None):
+    """ A wrapper for numpyro's scan primative that also contains a non-numpyro
+    counterpart implementation with similar functionality. See `jax.lax.scan`
+    for detailed code signature. """
     fn_to_wrap = None
     if bellini.backend == "numpyro":
         def scan_like(f, init, xs, length):

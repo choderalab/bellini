@@ -1,3 +1,6 @@
+""" High-level representations of random variables which can be compiled into
+backend-specific code """
+
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -17,6 +20,19 @@ from pint.errors import DimensionalityError
 class Distribution(abc.ABC):
     """ Base class for distributions. """
     def __init__(self, observed=False, name=None, **parameters):
+        """
+        Parameters
+        ----------
+        observed: bool, default=False
+            If the current node is observable (should only be `True` on
+            `SimpleDistribution`s)
+
+        name: str
+            Name of the node, used as a label when samples are drawn
+
+        **parameters
+            Any associated parameters in the Distribution
+        """
         self.parameters = parameters
         self.observed = observed
         self._name = name
@@ -208,6 +224,16 @@ class SimpleDistribution(Distribution):
 class ComposedDistribution(Distribution):
     """ A composed distribution made of two distributions. """
     def __init__(self, distributions, op):
+        """
+        Parameters
+        ----------
+        distributions: list of Distribution or Quantity
+            The two Distributions/Quantities as arguments for `op`. Must be length 2
+
+        op: str
+            Name of the operation to use. See :code:`bellini.api.functional.OPS`
+            for available ops
+        """
         super().__init__()
         assert len(distributions) == 2 # two at a time
         assert utils.check_broadcastable(*distributions)#, f"{distributions} {distributions[0].shape} {distributions[1].shape}"
@@ -303,8 +329,29 @@ class ComposedDistribution(Distribution):
 
 
 class TransformedDistribution(Distribution):
-    """ A transformed distribution from one base distribution. """
+    """ A transformed distribution from one base distribution. While originally
+    intended as a generalized form of distribution transformations such as
+    log or exp, this type is practically a wrapper for any numpy operation on
+    a stochastic value. For example, this allows for the concatenation of
+    Distributions and Quantities.
+
+    NOTE: This is only designed to work with np function that output one
+    output. Behavior hasn't been tested for np functions that return multiple
+    outputs. """
     def __init__(self, args, op, **kwargs):
+        """
+        Parameters
+        ----------
+        args: list of Distribution or Quantity
+            The Distributions/Quantities needed as arguments for `op`
+
+        op: str
+            Name of the numpy function to use. See :code:`bellini.api.functional`
+            for more information
+
+        **kwargs
+            Any keyword args needed for `op`
+        """
         super().__init__()
 
         args_contains_dist = np.array([
@@ -414,8 +461,30 @@ class TransformedDistribution(Distribution):
 
 # TODO: i need a better name for this
 class _JITDistribution(Distribution):
-    """ A wrapper for functions of random variables with multiple outputs """
+    """ A wrapper for functions of random variables with multiple outputs. In
+    particular, any high-performance code should be run within these. """
     def __init__(self, fn, inputs, label, deterministic_outputs=None):
+        """
+        Parameters
+        ----------
+        fn: Python callable
+            The function to be wrapped. `fn` must take in Quantities and return
+            a dictionary of str -> Quantity
+
+        inputs: dict
+            Inputs to `fn`. Should be structured argument name (str) -> input
+            object (Quantity, Distribution)
+
+        label: str
+            Which output to select from `fn(**inputs)`
+
+        deterministic_outputs: dict, optional
+            Outputs of running `fn` on a deterministic input. Used for if you
+            precompute the deterministic outputs of `fn(**inputs)` outside
+            _JITDistribution creation, which can allow you to take advantage
+            of caching this result instead of recomputing `fn(**inputs)`
+            repeatedly for every possible `label`.
+        """
         super().__init__()
         self.fn = fn
         self.inputs = inputs
@@ -558,8 +627,23 @@ class _JITDistribution(Distribution):
 
 
 class UnitChangedDistribution(Distribution):
-    """ A distribution whose units have been changed """
+    """ A distribution whose units have been changed. This prevents resampling
+    a value if you change unit systems during computation. """
     def __init__(self, distribution, new_units, force=False):
+        """
+        Parameters
+        ----------
+        distribution: Distribution
+            The Distribution whose units are being changed
+
+        new_units: ureg unit
+            The new units to adopt
+
+        force: bool, default=False
+            Whether or not to force the unit change if errors occur. This
+            should be avoided unless you are explicitly removing units from a
+            unit-ed object or adding units to a unitless object.
+        """
         assert not isinstance(distribution, UnitChangedDistribution), "can't have nested UnitChangedDistributions"
         self.distribution = distribution
         self._units = new_units
@@ -630,6 +714,15 @@ class UnitChangedDistribution(Distribution):
 class Normal(SimpleDistribution):
     """ Normal distribution. """
     def __init__(self, loc, scale, **kwargs):
+        """
+        Parameters
+        ----------
+        loc: Distribution or Quantity
+            `loc` parameter of Normal (see numpyro.distributions.Normal)
+
+        scale: Distribution or Quantity
+            `scale` parameter of Normal (see numpyro.distributions.Normal)
+        """
         assert loc.dimensionality == scale.dimensionality
         super().__init__(loc=loc, scale=scale, **kwargs)
 
@@ -686,6 +779,15 @@ class Normal(SimpleDistribution):
 class Uniform(SimpleDistribution):
     """ Uniform distribution. """
     def __init__(self, low, high, **kwargs):
+        """
+        Parameters
+        ----------
+        low: Distribution or Quantity
+            `low` parameter of Uniform (see numpyro.distributions.Uniform)
+
+        high: Distribution or Quantity
+            `high` parameter of Uniform (see numpyro.distributions.Uniform)
+        """
         assert low.dimensionality == high.dimensionality
         super().__init__(low=low, high=high, **kwargs)
 
@@ -742,6 +844,15 @@ class Uniform(SimpleDistribution):
 class LogNormal(SimpleDistribution):
     """ LogNormal distribution. """
     def __init__(self, loc, scale, **kwargs):
+        """
+        Parameters
+        ----------
+        loc: Distribution or Quantity
+            `loc` parameter of LogNormal (see numpyro.distributions.LogNormal)
+
+        scale: Distribution or Quantity
+            `scale` parameter of LogNormal (see numpyro.distributions.LogNormal)
+        """
         assert loc.dimensionality == scale.dimensionality
         super().__init__(loc=loc, scale=scale, **kwargs)
 
@@ -795,7 +906,7 @@ class LogNormal(SimpleDistribution):
             return f'LogNorm({u}, {sig})[{self.units}]'
 
 def gen_lognorm(loc, scale):
-    """ Generate a LogNormal that is centered at `loc` with scale `scale` """
+    """ Generate a LogNormal that is centered at loc `loc` with scale `scale` """
     assert loc.dimensionality == scale.dimensionality
     loc_units, scale_units = loc.units, scale.units
 
@@ -831,6 +942,20 @@ def gen_lognorm(loc, scale):
 class TruncatedNormal(SimpleDistribution):
     """ Truncated Normal distribution. """
     def __init__(self, low, loc, scale, **kwargs):
+        """
+        Parameters
+        ----------
+        low: Distribution or Quantity
+            Where to truncate the left half of the Normal
+            (see numpyro.distributions.TruncatedNormal)
+        loc: Distribution or Quantity
+            `loc` parameter of TruncatedNormal
+            (see numpyro.distributions.TruncatedNormal)
+
+        scale: Distribution or Quantity
+            `scale` parameter of TruncatedNormal
+            (see numpyro.distributions.TruncatedNormal)
+        """
         assert loc.dimensionality == scale.dimensionality
         assert low.dimensionality == loc.dimensionality
         super().__init__(low=low, loc=loc, scale=scale, **kwargs)

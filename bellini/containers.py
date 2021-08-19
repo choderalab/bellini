@@ -1,3 +1,7 @@
+"""
+Module containing various containers, which store Groups and interface with
+Procedure
+"""
 # =============================================================================
 # IMPORTS
 # =============================================================================
@@ -11,7 +15,6 @@ from bellini.reference import Reference as Ref
 # =============================================================================
 # Containers
 # =============================================================================
-
 
 class Container(object):
     """ Simple container for a solution """
@@ -51,19 +54,23 @@ class Container(object):
 
     @property
     def volume(self):
+        """ The volume of the current solution """
         if self.solution is not None:
             return self.solution.volume
         else:
             return Quantity(0.0, VOLUME_UNIT)
 
     def retrieve_aliquot(self, volume):
-        """ Removes an aliquot and returns it """
+        """ Removes an aliquot and returns it as well as the new Container with
+        the aliquot removed """
         # TODO: check that volume is enough to remove an aliquot
         assert self.solution is not None
         aliquot, source = self.solution.aliquot(volume)
         return aliquot, Container(solution=source, name=self.name)
 
     def receive_aliquot(self, solution):
+        """ Recieve an aliquot and return the new Container with aliquot added
+        """
         if self.solution is not None:
             new_solution = self.solution + solution
         else:
@@ -71,6 +78,8 @@ class Container(object):
         return Container(solution=new_solution, name=self.name)
 
     def apply_law(self, law):
+        """ Apply `law` to the current Solution and return it in a
+        new Container """
         if self.solution:
             return Container(
                 law(self.solution)
@@ -82,6 +91,7 @@ class Container(object):
         return f"Well containing {self.solution}"
 
     def observe(self, value, key=None):
+        """ Observe a particular attribute of the contained Solution """
         if isinstance(value, Ref):
             attr = getattr(self.solution, value.name)
             return value.retrieve_index(attr)

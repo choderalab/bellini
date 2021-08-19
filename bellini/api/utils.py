@@ -63,13 +63,16 @@ def mask(arr, idxs, invert=False):
     return bellini.Quantity(select, ureg.dimensionless)
 
 def check_shape(a, b):
+    """ Checks if the shape of `a` and `b` is the same """
     if not hasattr(a, "shape") or not hasattr(b, "shape"):
+        # automatically true if one of them is a scalar
         return True
     if a.shape != () and b.shape != ():
         return a.shape == b.shape
     return True
 
 def check_broadcastable(*args):
+    """ Check if the provided args are broadcastable """
     try:
         shape_args = [np.empty(arg.shape) for arg in args]
         np.broadcast(*shape_args)
@@ -77,13 +80,8 @@ def check_broadcastable(*args):
     except ValueError:
         return False
 
-# TODO:
-#
-# flatten args util
-# args to quantity util
-#
-
 def flatten(args, keep_keys=False):
+    """ Flatten a nested set of lists, tuples, and dicts """
     ret = []
     if isinstance(args, dict):
         for key, value in args.items():
@@ -98,6 +96,8 @@ def flatten(args, keep_keys=False):
     return ret
 
 def _to_x_constructor(fn):
+    """ Apply a function `fn` to all elements of lists and tuples, as well
+    as values in dicts, in a nested set of lists, tuples, and dicts """
     def _to_x(args):
         if isinstance(args, dict):
             return {
@@ -113,6 +113,7 @@ def _to_x_constructor(fn):
     return _to_x
 
 def _to_quantity(arg):
+    """ Convert `arg` to a deterministic Quantity """
     if isinstance(arg, bellini.Distribution):
         return bellini.Quantity(arg.magnitude, arg.units)
     elif isinstance(arg, bellini.Quantity):
@@ -123,3 +124,4 @@ def _to_quantity(arg):
         raise ValueError(f"unable to convert {arg} to Quantity")
 
 args_to_quantity = _to_x_constructor(_to_quantity)
+""" A function that converts all values in args to Quantities """

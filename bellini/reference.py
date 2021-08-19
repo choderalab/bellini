@@ -1,3 +1,7 @@
+"""
+Module containing Reference, a object useful for general subindex of objects
+"""
+
 class Reference(object):
     """ A container for a name and subindexing the object that name refers to """
     def __init__(self, name, slices=None):
