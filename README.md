@@ -6,7 +6,7 @@ bellini
 
 Bayesian Learning on Laboratory Investigations
 
-For preliminary documentation, see our [ReadTheDocs](https://bellini.readthedocs.io/en/dev-ajl/) page!
+For preliminary documentation, see our [ReadTheDocs](https://bellini.readthedocs.io/en/latest/) page!
 
 ### Copyright
 
