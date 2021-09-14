@@ -1,4 +1,4 @@
-name: test
+name: docs
 channels:
 
   - conda-forge
@@ -14,11 +14,6 @@ dependencies:
   - numpyro
   - numpy
   - pint
-
-    # Testing
-  - pytest
-  - pytest-cov
-  - codecov
 
     # Pip-only installs
   #- pip:

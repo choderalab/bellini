@@ -23,9 +23,9 @@ import bellini
 # -- Project information -----------------------------------------------------
 
 project = 'bellini'
-copyright = ("2020, Yuanqing Wang. Project structure based on the "
-             "Computational Molecular Science Python Cookiecutter version 1.3")
-author = 'Yuanqing Wang'
+copyright = ("2021, Alex Li, Yuanqing Wang. Project structure based on the "
+             "Computational Molecular Science Python Cookiecutter version 1.5")
+author = 'Alex Li, Yuanqing Wang'
 
 # The short X.Y version
 version = ''
